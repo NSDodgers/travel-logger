@@ -1,0 +1,23 @@
+# Secrets & local config
+secrets/
+*.env
+*.env.local
+.env*
+
+# Local build / runtime
+node_modules/
+dist/
+*.log
+
+# Docker volumes backed by host paths (if any)
+backups/
+pgdata/
+
+# Claude Code per-machine permission grants (keep team settings committed)
+.claude/settings.local.json
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp

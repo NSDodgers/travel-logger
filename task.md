@@ -1,0 +1,2 @@
+- [x] Update `travel_logger_scriptable.js` to prompt for Departure details (Origin, Dest, Sched Dep) at `Dep_InTransit` and Arrival details (Origin, Dest, Sched Land) at `Arr_OffPlane`.
+- [x] Update `app_script.js` to spawn rows natively on the respective sheets without pre-filling Arrivals at the Departure step.
