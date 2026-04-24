@@ -499,11 +499,11 @@ Mirrors Flow A/B with minimal sheet (destination address only — everything els
 
 Revised order per review (M11 "first real trip" promoted).
 
-1. **M1: Project scaffold.** Repo at `~/Code/travel-logger`, gstack team mode (done), GitHub source backup. Empty `web/` with pitch-black placeholder.
-2. **M2: Docker stack + Authelia.** `compose.yml` up. Caddy + Authelia + Postgres + PostgREST + bun-predict all healthy. First-time WebAuthn passkey registration works. `curl` from phone through tunnel → Authelia login → 200.
-3. **M3: Tunnel route live.** Cloudflared route `travel.myhometech.app` → localhost:8090. From iPhone: login with passkey (or password), "Add to Home Screen," PWA launches standalone. Session persists 30 days.
-4. **M4: Airport dataset.** Full OurAirports bundled, seeded into Postgres at init. IATA autocomplete in PWA.
-5. **M5: Historical import.** One-off importer reads the legacy `Departures` / `Arrivals` tabs from Google Sheet (last export or Apps Script), maps to new schema with `source='legacy'` and `bags/tsa='unknown'`, bulk inserts. Predictor now has years of data.
+1. **M1: Project scaffold.** ✅ Done 2026-04-23. Repo at `~/Code/travel-logger`, gstack team mode, GitHub source backup at `NSDodgers/travel-logger`.
+2. **M2: Docker stack + Authelia.** ✅ Done 2026-04-24. `compose.yml` with 6 services all healthy. Authelia mounted under `/auth` prefix (see gotchas memory). `curl` local 200s across the board.
+3. **M3: Tunnel route live.** ✅ Done 2026-04-24. `travel.myhometech.app` → `localhost:8090` via cloudflared. Login portal renders, Authelia session works from iPhone Safari.
+4. **M4: Airport dataset.** ✅ Done 2026-04-24. 5,515 airports (235 countries, 306 IANA timezones) seeded from OpenFlights. Regenerate via `bun run db/seeds/generate-airports.ts`; reload existing DB via `scripts/load-airports.sh`.
+5. **M5: Historical import.** ⏳ NEXT — see `docs/M5_BRIEF.md`. Data lives across multiple sources (Google Sheet, possibly older Shortcut/Scriptable records, maybe others). First task is inventory, then transform, then bulk-insert with `source='legacy'` and `bags/tsa='unknown'`. Expected to take a full session of structured Q&A.
 6. **M6: Address book + Mapbox.** Add/edit/archive. Mapbox Search JS Core autocomplete + on-demand pin confirmation.
 7. **M7: Log grid + edit/undo + departure flow.** Dep: In Transit creates trip; subsequent milestones one-tap; long-press edit/void; undo toast. Bag-hiding dynamic via `milestone_kinds.shown_when_carry_on`. Writes direct (no queue yet).
 8. **M8: Offline queue.** IndexedDB WAL + foreground retry loop (online + visibilitychange + interval). Dead-letter queue + error taxonomy. `persist()` requested. Airplane-mode E2E test passes.

@@ -16,6 +16,9 @@ authelia/*.log
 backups/
 pgdata/
 
+# Legacy data staged for M5 import — personal data, never committed
+imports/
+
 # Bun / Node
 node_modules/
 services/*/node_modules/

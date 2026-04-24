@@ -28,6 +28,8 @@ Use ~/.claude/skills/gstack/... for gstack file paths (the global path).
 
 **Canonical plan:** `implementation_plan.md` in this directory. Read it before making architectural decisions. If your change contradicts it, update the plan or flag the conflict before coding.
 
+**Current status:** read `STATUS.md` first — shows which milestones are done, what's running, and which file to read next. If the user is starting M5, also read `docs/M5_BRIEF.md`.
+
 **Stack (self-hosted on Nick's Mac Studio Docker + cloudflared):**
 - Frontend: vanilla HTML/CSS/JS PWA, no build step, served by a Caddy container.
 - Data: `postgres:16` container, exposed as REST by `postgrest`.
