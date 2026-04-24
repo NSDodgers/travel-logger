@@ -339,7 +339,7 @@ services:
     # WAL archiving to Backblaze B2; continuous, RPO ~5 min
     environment:
       WALG_S3_PREFIX: s3://travel-logger-wal/
-      AWS_ENDPOINT: https://s3.us-west-001.backblazeb2.com
+      AWS_ENDPOINT: https://s3.us-west-000.backblazeb2.com
     depends_on: [postgres]
     secrets: [b2_key]
 
