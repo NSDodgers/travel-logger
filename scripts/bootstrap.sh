@@ -96,29 +96,44 @@ prompt_file b2_key_id.txt            "Backblaze B2 keyID (short alphanumeric)"  
 prompt_file b2_application_key.txt   "Backblaze B2 applicationKey"               "M12 uses this; safe to paste now"
 
 # ── Authelia users.yml ──────────────────────────────────────────────
-if [ ! -s "$ROOT/authelia/users.yml" ]; then
-  warn "authelia/users.yml is missing"
-  printf "   Create it by copying the example and generating an Argon2id hash:\n"
-  printf "     cp authelia/users.yml.example authelia/users.yml\n"
-  printf "     docker run --rm -it authelia/authelia:4.38 authelia crypto hash generate argon2 -- --random.length 72\n"
-  printf "   Then paste the \$argon2id\$... hash into authelia/users.yml (replacing REPLACE_ME).\n"
+if [ ! -s "$ROOT/authelia/users.yml" ] || grep -q REPLACE_ME "$ROOT/authelia/users.yml" 2>/dev/null; then
+  warn "authelia/users.yml is missing or still has REPLACE_ME"
+  printf "   To create/fix it:\n"
+  printf "     1. Generate an Argon2id hash (enter your password twice when prompted):\n"
+  printf "          docker run --rm -it authelia/authelia:4.38 authelia crypto hash generate argon2\n"
+  printf "     2. Copy the full \$argon2id\$... string from the 'Digest:' line.\n"
+  printf "     3. cp authelia/users.yml.example authelia/users.yml  (if not already copied)\n"
+  printf "     4. Edit authelia/users.yml and replace the REPLACE_ME placeholder(s) with the hash.\n"
   printf "\n"
-  printf "   Want to do it now? [y/N]: "
+  printf "   Want me to run the hash command now? (You will still need to edit users.yml manually.) [y/N]: "
   read -r answer
   if [ "$answer" = "y" ] || [ "$answer" = "Y" ]; then
-    cp "$ROOT/authelia/users.yml.example" "$ROOT/authelia/users.yml"
-    printf "   You'll be prompted for a password. Keep it in your password manager.\n"
-    printf "   Running Authelia CLI in a container...\n\n"
-    docker run --rm -it authelia/authelia:4.38 authelia crypto hash generate argon2 -- --random.length 72
-    printf "\n   Paste the full hash into authelia/users.yml (replacing REPLACE_ME) and press Enter when done: "
+    if [ ! -f "$ROOT/authelia/users.yml" ]; then
+      cp "$ROOT/authelia/users.yml.example" "$ROOT/authelia/users.yml"
+      ok "copied users.yml.example → users.yml"
+    fi
+    printf "\n   Running Authelia hash generator — enter your password twice.\n"
+    printf "   Keep the password in your password manager (no recovery).\n\n"
+    # Capture output so we can echo the hash prominently at the end
+    docker run --rm -it authelia/authelia:4.38 authelia crypto hash generate argon2 || {
+      warn "hash generation failed or was cancelled"
+      warn "run it manually, edit users.yml, then re-run this script"
+      exit 1
+    }
+    printf "\n   Edit authelia/users.yml to replace REPLACE_ME with the Digest hash above.\n"
+    printf "   Press Enter when done: "
     read -r _
+    if grep -q REPLACE_ME "$ROOT/authelia/users.yml" 2>/dev/null; then
+      fail "users.yml still contains REPLACE_ME — re-run bootstrap.sh after editing"
+      exit 1
+    fi
   else
-    warn "skipping — run bootstrap.sh again after you've created authelia/users.yml"
+    warn "skipping — re-run bootstrap.sh after you've created authelia/users.yml"
     exit 1
   fi
 fi
 chmod 0600 "$ROOT/authelia/users.yml"
-ok "authelia/users.yml exists"
+ok "authelia/users.yml looks good"
 
 # ── Sanity checks ────────────────────────────────────────────────────
 log "Sanity-checking permissions..."
