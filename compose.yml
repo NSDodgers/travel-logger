@@ -41,10 +41,12 @@ services:
       AUTHELIA_SESSION_SECRET_FILE: /run/secrets/authelia_session
       AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/authelia_storage
       AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE: /run/secrets/authelia_db_password
+      AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /run/secrets/authelia_reset_jwt
     secrets:
       - authelia_session
       - authelia_storage
       - authelia_db_password
+      - authelia_reset_jwt
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,14 +120,13 @@ services:
       dockerfile: Dockerfile
     container_name: travel-predict
     restart: unless-stopped
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        export PG_URI="postgres://predict_user:$$(cat /run/secrets/predict_db_password)@postgres/travel"
-        exec bun run src/index.ts
+    # Password read from /run/secrets/predict_db_password inside the service —
+    # avoids URL-encoding issues with base64 chars (/, +, =).
     environment:
       PORT: "3001"
+      PG_HOST: postgres
+      PG_DATABASE: travel
+      PG_USER: predict_user
     secrets:
       - predict_db_password
     depends_on:
@@ -212,6 +213,8 @@ secrets:
     file: ./secrets/authelia_session.txt
   authelia_storage:
     file: ./secrets/authelia_storage.txt
+  authelia_reset_jwt:
+    file: ./secrets/authelia_reset_jwt.txt
   # Uncomment in M12 with walg:
   # b2_key_id:
   #   file: ./secrets/b2_key_id.txt

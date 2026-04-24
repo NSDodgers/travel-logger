@@ -18,8 +18,9 @@ theme: dark
 
 identity_validation:
   reset_password:
-    # Disable password reset via email — single user, no SMTP configured.
-    # If you forget your password, delete authelia/users.yml and regenerate.
+    # jwt_secret loaded from AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE (compose.yml).
+    # Required by Authelia v4.38+ config validator even though reset flow is unused
+    # (no SMTP configured). If you forget your password, edit users.yml directly.
     jwt_lifespan: 5m
 
 authentication_backend:

@@ -65,6 +65,7 @@ autogen_b64 postgrest_db_password.txt 48 "postgrest_user role password"
 autogen_b64 predict_db_password.txt   48 "predict_user role password"
 autogen_hex authelia_session.txt      64 "Authelia session cookie secret"
 autogen_hex authelia_storage.txt      64 "Authelia storage encryption key"
+autogen_hex authelia_reset_jwt.txt    64 "Authelia reset-password JWT secret (required even if unused)"
 
 # ── User-provided secrets (require manual paste) ────────────────────
 prompt_file() {

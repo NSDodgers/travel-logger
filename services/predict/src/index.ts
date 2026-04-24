@@ -4,14 +4,22 @@
 // which has already run the Authelia forward_auth check.
 
 import postgres from "postgres";
+import { readFileSync } from "node:fs";
 
-const PG_URI = process.env.PG_URI;
-if (!PG_URI) {
-  console.error("PG_URI not set");
-  process.exit(1);
-}
+// Read the DB password from the mounted Docker secret directly.
+// Avoids URL-encoding headaches — base64 passwords contain /, +, = which
+// break URL parsers (libpq is lenient; the JS URL constructor is not).
+const pgPassword = readFileSync(
+  process.env.PG_PASSWORD_FILE ?? "/run/secrets/predict_db_password",
+  "utf8",
+).trim();
 
-const sql = postgres(PG_URI, {
+const sql = postgres({
+  host: process.env.PG_HOST ?? "postgres",
+  port: Number(process.env.PG_PORT ?? 5432),
+  database: process.env.PG_DATABASE ?? "travel",
+  username: process.env.PG_USER ?? "predict_user",
+  password: pgPassword,
   max: 4,
   idle_timeout: 30,
   connect_timeout: 10,
