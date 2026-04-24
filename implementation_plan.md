@@ -279,7 +279,7 @@ services:
   caddy:
     image: caddy:2@sha256:<pinned>
     restart: unless-stopped
-    ports: ["127.0.0.1:8080:80"]
+    ports: ["127.0.0.1:8090:80"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./web:/srv:ro
@@ -357,7 +357,7 @@ secrets:
     file: ./secrets/b2_key.txt
 ```
 
-The cloudflared tunnel adds one new route: `travel.myhometech.app` → `http://localhost:8080`.
+The cloudflared tunnel adds one new route: `travel.myhometech.app` → `http://localhost:8090`.
 
 ### Caddyfile (sketch)
 
@@ -501,7 +501,7 @@ Revised order per review (M11 "first real trip" promoted).
 
 1. **M1: Project scaffold.** Repo at `~/Code/travel-logger`, gstack team mode (done), GitHub source backup. Empty `web/` with pitch-black placeholder.
 2. **M2: Docker stack + Authelia.** `compose.yml` up. Caddy + Authelia + Postgres + PostgREST + bun-predict all healthy. First-time WebAuthn passkey registration works. `curl` from phone through tunnel → Authelia login → 200.
-3. **M3: Tunnel route live.** Cloudflared route `travel.myhometech.app` → localhost:8080. From iPhone: login with passkey (or password), "Add to Home Screen," PWA launches standalone. Session persists 30 days.
+3. **M3: Tunnel route live.** Cloudflared route `travel.myhometech.app` → localhost:8090. From iPhone: login with passkey (or password), "Add to Home Screen," PWA launches standalone. Session persists 30 days.
 4. **M4: Airport dataset.** Full OurAirports bundled, seeded into Postgres at init. IATA autocomplete in PWA.
 5. **M5: Historical import.** One-off importer reads the legacy `Departures` / `Arrivals` tabs from Google Sheet (last export or Apps Script), maps to new schema with `source='legacy'` and `bags/tsa='unknown'`, bulk inserts. Predictor now has years of data.
 6. **M6: Address book + Mapbox.** Add/edit/archive. Mapbox Search JS Core autocomplete + on-demand pin confirmation.
@@ -606,7 +606,7 @@ System font stack (`-apple-system, system-ui, 'SF Pro Text'`). Sizes:
 ## 12. Prerequisites (on you)
 
 1. **Hostname**: `travel.myhometech.app` (locked).
-2. **Cloudflared tunnel**: already running — add route `travel.myhometech.app` → `http://localhost:8080`.
+2. **Cloudflared tunnel**: already running — add route `travel.myhometech.app` → `http://localhost:8090`.
 3. **Mapbox account** (free tier). Generate a URL-restricted access token for `https://travel.myhometech.app/*`.
 4. **Backblaze B2 account** (free 10 GB tier) for offsite WAL archiving. Create a bucket `travel-logger-wal`, application key with `writeFiles`/`readFiles`.
 5. **Docker Desktop / OrbStack** auto-start on login (System Settings).
