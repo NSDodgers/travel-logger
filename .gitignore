@@ -1,22 +1,30 @@
-# Secrets & local config
-secrets/
+# Secrets
+secrets/*
+!secrets/README.md
+!secrets/.gitkeep
 *.env
 *.env.local
-.env*
+.env
 
-# Local build / runtime
-node_modules/
-dist/
-*.log
+# Authelia runtime files (created by container at runtime)
+authelia/db.sqlite3
+authelia/notifications.txt
+authelia/users.yml
+authelia/*.log
 
-# Docker volumes backed by host paths (if any)
+# Postgres / backup volumes (host-mounted)
 backups/
 pgdata/
 
-# Claude Code per-machine permission grants (keep team settings committed)
+# Bun / Node
+node_modules/
+services/*/node_modules/
+*.log
+
+# Claude Code per-machine permission grants
 .claude/settings.local.json
 
-# Editor / OS noise
+# Editor / OS
 .DS_Store
 .idea/
 .vscode/

@@ -1,0 +1,79 @@
+# Authelia v4.38+ configuration for travel.myhometech.app
+# Docs: https://www.authelia.com/configuration/prologue/introduction/
+
+server:
+  address: tcp://:9091
+  buffers:
+    read: 4096
+    write: 4096
+
+log:
+  level: info
+  format: text
+
+theme: dark
+
+# Secrets below are read from /run/secrets/* (Docker secrets) or env vars *_FILE variants
+# See compose.yml for the mapping.
+
+identity_validation:
+  reset_password:
+    # Disable password reset via email — single user, no SMTP configured.
+    # If you forget your password, delete authelia/users.yml and regenerate.
+    jwt_lifespan: 5m
+
+authentication_backend:
+  file:
+    path: /config/users.yml
+    password:
+      algorithm: argon2id
+      iterations: 3
+      salt_length: 16
+      parallelism: 4
+      memory: 65536
+
+access_control:
+  default_policy: one_factor
+  rules:
+    - domain: travel.myhometech.app
+      policy: one_factor
+
+session:
+  # Secret loaded from AUTHELIA_SESSION_SECRET_FILE env var (see compose.yml)
+  cookies:
+    - name: authelia_session
+      domain: myhometech.app
+      authelia_url: https://travel.myhometech.app/auth/
+      default_redirection_url: https://travel.myhometech.app
+      remember_me: 720h           # 30 days — travel app, long sessions
+      expiration: 12h
+      inactivity: 2h
+
+regulation:
+  max_retries: 5
+  find_time: 2m
+  ban_time: 15m
+
+storage:
+  # encryption_key loaded from AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE
+  postgres:
+    address: 'tcp://postgres:5432'
+    database: authelia
+    username: authelia_user
+    # password loaded from AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE
+
+notifier:
+  # No SMTP — writes password reset / account notifications to a local file.
+  # Check authelia/notifications.txt on the host if you ever need a reset link.
+  filesystem:
+    filename: /config/notifications.txt
+
+# Hardening
+totp:
+  issuer: travel.myhometech.app
+  period: 30
+
+webauthn:
+  disable: false
+  timeout: 60s
+  display_name: Travel Logger

@@ -1,0 +1,16 @@
+# Authelia user database — file-based backend
+# Copy to authelia/users.yml, replace the password hash, chmod 0600, then do NOT commit.
+#
+# Generate an Argon2id hash for your password:
+#   docker run --rm -it authelia/authelia:4.38 authelia crypto hash generate argon2 -- --random.length 72
+# You'll be prompted for a password. Copy the entire "$argon2id$..." string into the password: field below.
+
+users:
+  nick:
+    disabled: false
+    displayname: "Nick Solyom"
+    # REPLACE THIS with your own Argon2id hash — see instructions above
+    password: "$argon2id$v=19$m=65536,t=3,p=4$REPLACE_ME$REPLACE_ME"
+    email: "Nick@solyomdesign.com"
+    groups:
+      - admins

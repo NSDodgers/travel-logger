@@ -1,0 +1,79 @@
+# Travel Logger reverse proxy
+# TLS is terminated at Cloudflare's edge; cloudflared → localhost:8090 → this Caddy (plain HTTP).
+# We listen on :80 inside the container; host publishes to 127.0.0.1:8090.
+{
+	# Auto HTTPS off — we're behind cloudflared, which handles TLS.
+	auto_https off
+	admin off
+
+	# Trust cloudflared for X-Forwarded-* headers (private Docker network IPs).
+	servers {
+		trusted_proxies static private_ranges
+	}
+
+	# Default log format
+	log {
+		output stdout
+		format console
+		level INFO
+	}
+}
+
+# Listen on port 80 inside the container (all requests, any Host header —
+# cloudflared only routes travel.myhometech.app to us, so this is fine).
+:80 {
+	# ─── Authelia forward_auth on everything by default ─────────────────
+	# Every request is redirected to Authelia's /api/verify first.
+	# Authelia returns 200 with Remote-* headers if authed, or 401 + redirect to portal.
+	forward_auth @protected authelia:9091 {
+		uri /api/verify?rd=https://travel.myhometech.app/auth/
+		copy_headers Remote-User Remote-Email Remote-Name Remote-Groups
+	}
+
+	# ─── Matchers ───────────────────────────────────────────────────────
+	@auth path /auth /auth/*
+	@api_predict path /api/predict /api/predict/*
+	@api path /api /api/*
+
+	# @protected matches everything EXCEPT the Authelia portal path itself
+	# (the portal has to be reachable unauthenticated so the user can log in).
+	@protected not path /auth /auth/*
+
+	# ─── Route: Authelia portal (unauthenticated) ───────────────────────
+	handle @auth {
+		reverse_proxy authelia:9091
+	}
+
+	# ─── Route: predict service ─────────────────────────────────────────
+	handle @api_predict {
+		reverse_proxy bun-predict:3001
+	}
+
+	# ─── Route: PostgREST ───────────────────────────────────────────────
+	handle @api {
+		reverse_proxy postgrest:3000
+	}
+
+	# ─── Route: static PWA ──────────────────────────────────────────────
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	# ─── Security headers ───────────────────────────────────────────────
+	header {
+		# Tight CSP: single origin + explicit Mapbox allowlist for autocomplete.
+		# Adjust script-src/style-src if inline needed during dev.
+		Content-Security-Policy "default-src 'self'; connect-src 'self' https://api.mapbox.com https://events.mapbox.com; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://api.mapbox.com; font-src 'self' data:; frame-ancestors 'none'; form-action 'self'"
+
+		# Other hardening
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(self), camera=(), microphone=()"
+		X-Frame-Options "DENY"
+
+		# PWA / iOS
+		-Server
+	}
+}

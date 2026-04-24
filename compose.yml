@@ -1,0 +1,221 @@
+# Travel Logger — self-hosted stack on Nick's Mac Studio
+# Host binding: 127.0.0.1:8090 (cloudflared → this; don't publish publicly)
+#
+# NOTE on image pins: images are tag-pinned to major/minor versions for the M2 scaffold.
+# Digest-pinning (the plan's aspiration) is deferred until after first `docker compose pull`
+# — see scripts/pin-digests.sh (future). Updating: review CHANGELOGs quarterly, bump tags.
+
+services:
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Caddy — reverse proxy, auth gatekeeper (via forward_auth), static host
+  # ──────────────────────────────────────────────────────────────────────
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: travel-caddy
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - authelia
+      - postgrest
+      - bun-predict
+    networks:
+      - travel
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Authelia — forward-auth portal, session storage in Postgres
+  # ──────────────────────────────────────────────────────────────────────
+  authelia:
+    image: authelia/authelia:4.38
+    container_name: travel-authelia
+    restart: unless-stopped
+    volumes:
+      - ./authelia:/config
+    environment:
+      AUTHELIA_SESSION_SECRET_FILE: /run/secrets/authelia_session
+      AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/authelia_storage
+      AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE: /run/secrets/authelia_db_password
+    secrets:
+      - authelia_session
+      - authelia_storage
+      - authelia_db_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - travel
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Postgres — source of truth
+  # ──────────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: travel-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+      POSTGRES_DB: travel
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    secrets:
+      - pg_password
+      - authelia_db_password
+      - postgrest_db_password
+      - predict_db_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d travel"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - travel
+
+  # ──────────────────────────────────────────────────────────────────────
+  # PostgREST — CRUD over the `api` schema
+  # ──────────────────────────────────────────────────────────────────────
+  postgrest:
+    image: postgrest/postgrest:v12.2.0
+    container_name: travel-postgrest
+    restart: unless-stopped
+    # PostgREST doesn't support PGRST_DB_URI_FILE, so we read the password from
+    # the secret file at container start and construct the URI inline.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        export PGRST_DB_URI="postgres://postgrest_user:$$(cat /run/secrets/postgrest_db_password)@postgres/travel"
+        exec /bin/postgrest
+    environment:
+      PGRST_DB_SCHEMA: api
+      PGRST_DB_ANON_ROLE: postgrest_user
+      PGRST_DB_POOL: "5"
+      PGRST_OPENAPI_SERVER_PROXY_URI: "https://travel.myhometech.app/api"
+      # No JWT — trust is delegated to Caddy's forward_auth upstream
+      PGRST_SERVER_PORT: "3000"
+    secrets:
+      - postgrest_db_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - travel
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Bun predict service — M2 skeleton; real logic lands in M10
+  # ──────────────────────────────────────────────────────────────────────
+  bun-predict:
+    build:
+      context: ./services/predict
+      dockerfile: Dockerfile
+    container_name: travel-predict
+    restart: unless-stopped
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        export PG_URI="postgres://predict_user:$$(cat /run/secrets/predict_db_password)@postgres/travel"
+        exec bun run src/index.ts
+    environment:
+      PORT: "3001"
+    secrets:
+      - predict_db_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - travel
+
+  # ──────────────────────────────────────────────────────────────────────
+  # pg_dump nightly backup — writes to ./backups + iCloud mirror
+  # ──────────────────────────────────────────────────────────────────────
+  pgbackup:
+    image: postgres:16-alpine
+    container_name: travel-pgbackup
+    restart: unless-stopped
+    entrypoint: ["/ops/backup.sh"]
+    volumes:
+      - ./ops:/ops:ro
+      - ./backups:/backups
+      # iCloud Drive mirror — create ~/Library/Mobile Documents/com~apple~CloudDocs/backups/travel/ first
+      - ${HOME}/Library/Mobile Documents/com~apple~CloudDocs/backups/travel:/icloud-backups
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGDATABASE: travel
+      PGPASSWORD_FILE: /run/secrets/pg_password
+      BACKUP_CRON_HOUR: "03"    # 3 AM local
+      RETENTION_DAYS: "30"
+    secrets:
+      - pg_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - travel
+
+  # ──────────────────────────────────────────────────────────────────────
+  # wal-g continuous WAL archiving to Backblaze B2 — deferred to M12
+  # Uncomment in M12 after configuring wal-g postgres image + archive_command.
+  # ──────────────────────────────────────────────────────────────────────
+  # walg:
+  #   image: ghcr.io/wal-g/wal-g:latest  # TODO: pin digest in M12
+  #   container_name: travel-walg
+  #   restart: unless-stopped
+  #   environment:
+  #     WALG_S3_PREFIX: s3://travel-logger-wal/
+  #     AWS_ENDPOINT: https://s3.us-west-000.backblazeb2.com
+  #     AWS_REGION: us-west-000
+  #     AWS_ACCESS_KEY_ID_FILE: /run/secrets/b2_key_id
+  #     AWS_SECRET_ACCESS_KEY_FILE: /run/secrets/b2_application_key
+  #     WALG_LIBSODIUM_KEY_FILE: /run/secrets/walg_libsodium_key   # optional client-side encryption
+  #     PGHOST: postgres
+  #     PGUSER: postgres
+  #     PGPASSWORD_FILE: /run/secrets/pg_password
+  #   secrets:
+  #     - b2_key_id
+  #     - b2_application_key
+  #     - pg_password
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   networks:
+  #     - travel
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  travel:
+    driver: bridge
+
+secrets:
+  pg_password:
+    file: ./secrets/pg_password.txt
+  authelia_db_password:
+    file: ./secrets/authelia_db_password.txt
+  postgrest_db_password:
+    file: ./secrets/postgrest_db_password.txt
+  predict_db_password:
+    file: ./secrets/predict_db_password.txt
+  authelia_session:
+    file: ./secrets/authelia_session.txt
+  authelia_storage:
+    file: ./secrets/authelia_storage.txt
+  # Uncomment in M12 with walg:
+  # b2_key_id:
+  #   file: ./secrets/b2_key_id.txt
+  # b2_application_key:
+  #   file: ./secrets/b2_application_key.txt
+  # walg_libsodium_key:
+  #   file: ./secrets/walg_libsodium_key.txt

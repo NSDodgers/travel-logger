@@ -1,0 +1,12 @@
+{
+  "name": "Travel Logger",
+  "short_name": "Travel",
+  "description": "Personal airport milestone logger + travel predictor",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": []
+}

@@ -1,0 +1,17 @@
+{
+  "name": "travel-logger-predict",
+  "version": "0.1.0",
+  "description": "Thin TS service for travel prediction (percentile + filter widening). Scaffolded in M2; real logic lands in M10.",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "postgres": "^3.4.4"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.5.0"
+  }
+}

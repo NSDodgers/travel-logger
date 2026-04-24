@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<title>Travel Logger</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; padding: 0; background: #000; color: #fff; }
+  body {
+    font: 17px/1.4 -apple-system, system-ui, 'SF Pro Text', sans-serif;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .wrap { max-width: 480px; padding: 24px; text-align: center; }
+  h1 { font-size: 32px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.02em; }
+  .accent { color: #FF9F0A; }
+  .meta { color: #8E8E93; font-size: 14px; margin-top: 16px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Travel Logger</h1>
+    <p class="accent">M2 — stack online</p>
+    <p class="meta">The real UI lands in M7. You're seeing this because Caddy is serving static files and Authelia let you through.</p>
+  </div>
+</body>
+</html>
