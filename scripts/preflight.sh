@@ -62,7 +62,8 @@ fi
 
 # ── 5. Cloudflared tunnel reachable (public URL) ─────────────────────
 printf "Checking public URL https://travel.myhometech.app ... "
-code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 -I https://travel.myhometech.app/ || echo "000")
+code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 -I https://travel.myhometech.app/ 2>/dev/null || true)
+[ -z "$code" ] && code="000"
 case "$code" in
   200|302|401)
     ok "Public URL reachable (HTTP $code)"
