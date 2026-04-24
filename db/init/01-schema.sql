@@ -26,7 +26,8 @@ create table public.airports (
   name    text not null,
   city    text,
   country text,
-  tz      text not null check (tz ~ '^[A-Za-z_]+/[A-Za-z_+-]+')
+  -- IANA tz; allow multi-component zones (America/Argentina/Buenos_Aires, Etc/GMT+5, etc.)
+  tz      text not null check (tz ~ '^[A-Za-z_0-9+-]+(/[A-Za-z_0-9+-]+)*$')
 );
 
 -- ─── Addresses ────────────────────────────────────────────────────────────

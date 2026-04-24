@@ -29,3 +29,4 @@ services/*/node_modules/
 .idea/
 .vscode/
 *.swp
+.gstack/
