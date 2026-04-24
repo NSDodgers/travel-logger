@@ -23,10 +23,11 @@
 # cloudflared only routes travel.myhometech.app to us, so this is fine).
 :80 {
 	# ─── Authelia forward_auth on everything by default ─────────────────
-	# Every request is redirected to Authelia's /api/verify first.
-	# Authelia returns 200 with Remote-* headers if authed, or 401 + redirect to portal.
+	# Every request is redirected to Authelia's /auth/api/verify first (Authelia
+	# is mounted under /auth prefix — see authelia/configuration.yml).
+	# Returns 200 with Remote-* headers if authed, or 401 + redirect to portal.
 	forward_auth @protected authelia:9091 {
-		uri /api/verify?rd=https://travel.myhometech.app/auth/
+		uri /auth/api/verify?rd=https://travel.myhometech.app/auth/
 		copy_headers Remote-User Remote-Email Remote-Name Remote-Groups
 	}
 

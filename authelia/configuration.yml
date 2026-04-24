@@ -2,7 +2,11 @@
 # Docs: https://www.authelia.com/configuration/prologue/introduction/
 
 server:
-  address: tcp://:9091
+  # Path prefix /auth ensures all Authelia URLs (including static assets at
+  # /auth/static/*) live under the same /auth/* space — so they're covered by
+  # the Caddyfile's unauthenticated bypass matcher. Without this, the portal's
+  # own CSS/JS gets auth-gated and the browser receives HTML instead of stylesheets.
+  address: tcp://:9091/auth
   buffers:
     read: 4096
     write: 4096
