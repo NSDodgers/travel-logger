@@ -129,6 +129,28 @@ type TripRow = {
   notes: string | null;
 };
 
+// ── slug → display label map ────────────────────────────────────────────────
+// Locked 2026-04-24 at the start of M6. Nick is renaming the 14 M5 legacy
+// addresses to human-readable labels. This keeps the loader in sync: emit the
+// clean label directly, and look up trip FKs by that same clean label.
+// Kept in lockstep with db/migrations/002-rename-legacy-addresses.sql.
+const SLUG_TO_DISPLAY: Record<string, string> = {
+  home_inwood:      "Home",
+  home_192nd:       "192nd St",
+  home_bronx:       "240th St (Bronx)",
+  mom_burbank:      "Mom's (Burbank)",
+  mil_long_beach:   "MIL's (Long Beach)",
+  steppenwolf:      "Steppenwolf",
+  art_cambridge:    "A.R.T. (Cambridge)",
+  chicago_state:    "Chicago — State St",
+  chicago_parkline: "Chicago — Parkline",
+  chicago_grand:    "Chicago — Grand Ave",
+  chicago_level:    "Chicago — Level",
+  boston_ames:      "Boston — Ames St",
+  toronto_victoria: "Toronto — Victoria St",
+  koln_vogelsanger: "Köln — Vogelsanger",
+};
+
 // ── loaders ─────────────────────────────────────────────────────────────────
 
 function loadAddresses(): Address[] {
@@ -872,26 +894,41 @@ function emitSql(addresses: Address[], trips: TripRow[]): string {
   lines.push("-- is visible. Migration 05-m5-prep made this FK deferrable.");
   lines.push("set constraints milestones_history_milestone_id_fkey deferred;");
   lines.push("");
-  lines.push("-- Idempotency: wipe existing legacy data before reload");
+  lines.push("-- Idempotency: wipe existing legacy data before reload.");
+  lines.push("-- Addresses are deleted by exact match on the clean labels (M6 rename);");
+  lines.push("-- the legacy:% pattern is kept as a defensive fallback for stacks that");
+  lines.push("-- predate migration 002.");
   lines.push("delete from public.milestones where trip_id in (select id from public.trips where source = 'legacy');");
   lines.push("delete from public.trips where source = 'legacy';");
-  lines.push("delete from public.addresses where label like '%legacy:%';");
+  const displayLabels = addresses
+    .map((a) => SLUG_TO_DISPLAY[a.id])
+    .filter((v): v is string => v !== undefined)
+    .map((v) => `'${v.replace(/'/g, "''")}'`)
+    .join(", ");
+  lines.push(`delete from public.addresses where label in (${displayLabels}) or label like 'legacy:%';`);
   lines.push("");
-  lines.push("-- Addresses (legacy: prefix marker in label so we can wipe them cleanly on re-run)");
+  lines.push("-- Addresses (human-readable labels per M6 rename mapping)");
   for (const a of addresses) {
+    const display = SLUG_TO_DISPLAY[a.id];
+    if (!display) {
+      throw new Error(`No SLUG_TO_DISPLAY mapping for address id '${a.id}'. Add it to import-legacy.ts.`);
+    }
     lines.push(
       `insert into public.addresses (label, formatted, lat, lng) values ` +
-      `(${sqlEscape("legacy:" + a.id)}, ${sqlEscape(a.label)}, ${a.lat}, ${a.lng}) ` +
+      `(${sqlEscape(display)}, ${sqlEscape(a.label)}, ${a.lat}, ${a.lng}) ` +
       `on conflict do nothing;`
     );
   }
   lines.push("");
-  lines.push("-- Trips: each row references an address by its 'legacy:<id>' label, and an airport by IATA.");
+  lines.push("-- Trips: each row references an address by its clean label, and an airport by IATA.");
 
-  // Map from address id slug to label for SQL subquery lookups
-  const addrLabel = (id: string | null) => id === null
-    ? "null"
-    : `(select id from public.addresses where label = 'legacy:${id}' limit 1)`;
+  // Map from address id slug to label for SQL subquery lookups (now using clean display labels).
+  const addrLabel = (id: string | null) => {
+    if (id === null) return "null";
+    const display = SLUG_TO_DISPLAY[id];
+    if (!display) throw new Error(`No SLUG_TO_DISPLAY mapping for address id '${id}' referenced by a trip.`);
+    return `(select id from public.addresses where label = ${sqlEscape(display)} limit 1)`;
+  };
 
   // For each trip, emit INSERT plus milestones
   for (let i = 0; i < trips.length; i++) {
