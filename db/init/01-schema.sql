@@ -71,6 +71,7 @@ create table public.trips (
   transit             text not null check (transit in ('car','public')),
   tsa_precheck        boolean not null default false,
   international       boolean not null default false,  -- toggles dep_customs tile visibility (M7)
+  test                boolean not null default false,  -- M11: QA/dogfooding trips that don't feed predictions
 
   status              text not null default 'in_progress' check (status in ('in_progress','complete','abandoned')),
   source              text not null default 'app' check (source in ('app','legacy')),
@@ -196,7 +197,7 @@ create view api.trips as
   select
     id, direction, address_id, dep_airport, arr_airport, actual_arr_airport,
     sched_dep_local, sched_arr_local, sched_dep_date, sched_arr_date,
-    dst_warning, bags, party, transit, tsa_precheck, international,
+    dst_warning, bags, party, transit, tsa_precheck, international, test,
     status, source, created_at, updated_at
   from public.trips;
 
