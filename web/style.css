@@ -705,3 +705,91 @@ a { color: var(--accent); text-decoration: none; }
   text-align: center;
   color: var(--muted);
 }
+
+/* ── Sync strip + dead-letter + auth modal (M8) ────────────────────────── */
+
+.sync-strip {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sync-strip[hidden] { display: none; }
+.sync-strip[data-level="pending"] { background: rgba(255,159,10,0.18); color: var(--accent); }
+.sync-strip[data-level="syncing"] { background: rgba(10,132,255,0.18); color: #5ac8fa; cursor: default; }
+.sync-strip[data-level="retrying"] { background: rgba(255,159,10,0.18); color: var(--accent); }
+.sync-strip[data-level="dead"]    { background: rgba(255,59,48,0.18); color: var(--error); }
+
+.dead-letter-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.dead-letter-row {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.dead-letter-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+.dead-letter-error {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--error);
+  word-break: break-word;
+}
+.dead-letter-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+.dead-letter-actions .btn {
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.auth-expired-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0,0,0,0.78);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.auth-expired-modal[hidden] { display: none; }
+.auth-expired-card {
+  width: 100%;
+  max-width: 360px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+.auth-expired-card h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+.auth-expired-card p {
+  margin: 0 0 20px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.auth-expired-card .btn { width: 100%; }

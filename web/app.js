@@ -12,6 +12,8 @@ import {
   addressAddScreen,
   addressEditScreen,
 } from './screens/addresses.js';
+import { init as initQueue } from './queue.js';
+import { mountSyncStrip } from './sync-strip.js';
 
 // ── Router ─────────────────────────────────────────────────────────────────
 
@@ -141,3 +143,8 @@ window.addEventListener('DOMContentLoaded', render);
 // If the document is already past DOMContentLoaded when this module finishes
 // loading, fire once manually so the first render still happens.
 if (document.readyState !== 'loading') render();
+
+// Outbox + sync strip + auth-expired modal. Mount sync UI before init() so
+// the strip can render any leftover state from a previous session.
+mountSyncStrip(screenEl);
+initQueue().catch((err) => console.error('queue init failed:', err));
