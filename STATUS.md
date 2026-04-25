@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-04-24 after M6. Update this file at the end of each milestone._
+_Last updated: 2026-04-25 after M7. Update this file at the end of each milestone._
 
 ## Milestones
 
@@ -12,8 +12,9 @@ _Last updated: 2026-04-24 after M6. Update this file at the end of each mileston
 | M4 | ✅ | 5,515 airports seeded |
 | M5 | ✅ | Historical import: 231 trips + 536 milestones loaded (2017-08 → 2026-04). 14 addresses, 8 sources reconciled. See `docs/M5_INVENTORY.md` + `docs/M5_QUIZ*.md`; re-run via `./scripts/load-legacy.sh` |
 | M6 | ✅ | PWA shell + address book. 14 legacy labels renamed to human-readable. Mapbox Search REST + static-image pin; add/edit/archive wired through PostgREST. Caddy shim exposes `/config.js` from the `mapbox_token` secret at startup. Cloudflare cache bypassed for the hostname so iteration loop stays fast. QA driver added (`scripts/qa.ts`, Playwright persistent profile). See `docs/M6_BRIEF.md` for spec. |
-| **M7** | **⏳ next** | Log grid + edit/undo + departure flow. See `docs/M7_BRIEF.md`. |
-| M8–M13 | planned | See `implementation_plan.md` §8 |
+| M7 | ✅ | Departure log flow live: empty hero → trip-start sheet (origin, dep+arr airport pickers, sched dep/arr datetime, bags/party/transit/TSA/international toggles, DST validation) → 2×2 hero+strip grid with one-tap milestone progression → "All milestones logged" gate → tap-to-finish. Long-press (touch ≥500ms or contextmenu) opens edit-time/void sheet. 60s undo toast on every tap; undoing the final tap reopens an auto-completed trip. Two migrations: 003 splits the audit trigger (BEFORE-touch + AFTER-audit, SECURITY DEFINER) so PostgREST can write through it; 004 persists the `international` flag on trips. Layout: hero + 4-tile strip (Nick chose this over fixed 2×4 since dep/arr both have 5 kinds). Customs visibility: manual flag in trip-start sheet. |
+| **M8** | **⏳ next** | Offline queue (IndexedDB WAL + foreground retry loop). See `implementation_plan.md` §8. |
+| M9–M13 | planned | See `implementation_plan.md` §8 |
 
 ## Currently running on Mac Studio
 
@@ -120,6 +121,11 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 
 - 14 legacy addresses renamed from `legacy:<slug>` → clean labels (Home, Mom's, Steppenwolf, etc.) via `db/migrations/002-rename-legacy-addresses.sql`. `import-legacy.ts` carries the slug→label map so a wipe+reload reproduces the renamed state; its wipe still sweeps `legacy:%` as a defensive fallback.
 
+## Schema changes in M7
+
+- Migration `003-milestones-audit-security-definer.sql` splits the original `BEFORE INSERT OR UPDATE` trigger on `public.milestones` into two: `milestones_touch_trg` (BEFORE UPDATE) just bumps `updated_at`; `milestones_audit_trg` (AFTER INSERT OR UPDATE) writes to `public.milestones_history`. The audit function is `SECURITY DEFINER` with a locked `search_path` so PostgREST's `postgrest_user` (no grants on `public.*`) can still write through the trigger. The original BEFORE trigger crashed because the milestones row hadn't been inserted yet when the immediate FK on `milestones_history.milestone_id` was checked.
+- Migration `004-trips-international-flag.sql` adds `public.trips.international boolean default false` and re-creates `api.trips` (drop+create — `replace view` can't reorder columns). Drives the M7 dep_customs tile visibility and survives page reload mid-trip.
+
 ## External accounts / dashboards
 
 | Service | What | Where |
@@ -132,11 +138,11 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 ## If Claude is starting a fresh session
 
 1. Read this file first.
-2. Read `docs/M7_BRIEF.md` — the next milestone's full spec, decision points, deliverables.
-3. Read `implementation_plan.md` — the canonical plan (Flow A/B in §7, milestones in §8, UI spec in §10).
-4. Read `CLAUDE.md` — project brief + skill routing.
-5. Memory at `~/.claude/projects/-Users-nicksolyom-Library-Mobile-Documents-com-apple-CloudDocs-travel-time-sheet-project/memory/MEMORY.md` has cross-session context (decisions, gotchas, Cloudflare bypass, QA driver).
-6. For UI patterns, study `web/screens/addresses.js` — it's the reference for how a screen interacts with the shell, the API client, the form helpers, the toast.
-7. For browser-driven QA: `bun run qa login` once, then `bun run qa <cmd>` (see `scripts/qa.ts` header).
+2. Read `implementation_plan.md` — the canonical plan (Flow A/B in §7, milestones in §8, UI spec in §10). Next up is M8 (offline queue).
+3. Read `CLAUDE.md` — project brief + skill routing.
+4. Memory at `~/.claude/projects/-Users-nicksolyom-Library-Mobile-Documents-com-apple-CloudDocs-travel-time-sheet-project/memory/MEMORY.md` has cross-session context (decisions, gotchas, Cloudflare bypass, QA driver).
+5. For UI patterns, study `web/screens/log.js` (M7 — primary screen, sheet primitive, optimistic UI) and `web/screens/addresses.js` (M6 — list/form/toast).
+6. For browser-driven QA: `bun run qa login` once, then `bun run qa <cmd>` (see `scripts/qa.ts` header). Tip: Caddy serves `Cache-Control: no-store` but the Playwright persistent profile still caches; force-bust with `location.href = '/?_=' + Date.now() + '#/whatever'` before each verification round.
+7. M7 reference: `docs/M7_BRIEF.md` for what was scoped; `web/screens/log.js` for the implementation.
 8. M6 reference (if M6 context is needed): `docs/M6_BRIEF.md`.
 9. M5 reference (only if historical data context is needed): `docs/M5_INVENTORY.md`, `docs/M5_QUIZ.md`, `docs/M5_QUIZ_2.md`.
