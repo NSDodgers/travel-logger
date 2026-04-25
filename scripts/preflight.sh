@@ -77,7 +77,46 @@ case "$code" in
     ;;
 esac
 
-# ── 6. Secret file permissions ───────────────────────────────────────
+# ── 6. Backup recency (M12) ──────────────────────────────────────────
+printf "Checking recent local pg_dump ... "
+latest=$(ls -1t backups/travel-*.sql.gz 2>/dev/null | head -1)
+if [ -z "$latest" ]; then
+  fail "No pg_dump file in ./backups/"
+  FAILED=$((FAILED + 1))
+else
+  # macOS stat differs from Linux — branch on uname
+  if [ "$(uname)" = "Darwin" ]; then
+    age=$(( $(date +%s) - $(stat -f %m "$latest") ))
+  else
+    age=$(( $(date +%s) - $(stat -c %Y "$latest") ))
+  fi
+  if [ "$age" -gt 90000 ]; then  # 25h grace
+    fail "Latest pg_dump is $((age / 3600))h old (>25h): $latest"
+    FAILED=$((FAILED + 1))
+  else
+    ok "Latest pg_dump is $((age / 3600))h old: $(basename "$latest")"
+  fi
+fi
+
+printf "Checking B2 off-site upload marker ... "
+marker=backups/.last-b2-upload
+if [ ! -f "$marker" ]; then
+  warn "No B2 upload marker yet — run \`docker compose exec pgbackup /ops/backup.sh run-once\` to seed"
+else
+  if [ "$(uname)" = "Darwin" ]; then
+    age=$(( $(date +%s) - $(stat -f %m "$marker") ))
+  else
+    age=$(( $(date +%s) - $(stat -c %Y "$marker") ))
+  fi
+  if [ "$age" -gt 90000 ]; then
+    fail "Last B2 upload was $((age / 3600))h ago (>25h)"
+    FAILED=$((FAILED + 1))
+  else
+    ok "Last B2 upload was $((age / 3600))h ago"
+  fi
+fi
+
+# ── 7. Secret file permissions ───────────────────────────────────────
 printf "Checking secret file permissions ... "
 bad=0
 for f in secrets/*.txt authelia/users.yml; do
