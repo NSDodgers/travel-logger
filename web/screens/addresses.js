@@ -244,13 +244,15 @@ function mountAddressForm(root, { mode, existing }) {
         mapbox_id: state.picked.mapbox_id,
       };
       if (mode === 'add') {
-        await api.post('/addresses', body);
+        // Client-generate the id so the new row has a stable identity in the
+        // queue (PostgREST will honor it on insert).
+        api.post('/addresses', { id: cryptoRandomId(), ...body }, { intent: 'address_create' });
         window.__toast?.('Address saved', { level: 'success' });
       } else {
-        // Bump updated_at client-side so the list re-sorts — no trigger yet.
-        await api.patch(
+        api.patch(
           `/addresses?id=eq.${encodeURIComponent(existing.id)}`,
-          { ...body, updated_at: new Date().toISOString() },
+          body,
+          { intent: 'address_edit' },
         );
         window.__toast?.('Address updated', { level: 'success' });
       }
@@ -265,25 +267,27 @@ function mountAddressForm(root, { mode, existing }) {
   });
 
   if (archiveBtn) {
-    archiveBtn.addEventListener('click', async () => {
+    archiveBtn.addEventListener('click', () => {
       const nextArchived = !existing.archived;
       archiveBtn.disabled = true;
       setError(errorEl, null);
-      try {
-        await api.patch(
-          `/addresses?id=eq.${encodeURIComponent(existing.id)}`,
-          { archived: nextArchived, updated_at: new Date().toISOString() },
-        );
-        window.__toast?.(nextArchived ? 'Address archived' : 'Address restored', { level: 'success' });
-        location.hash = '/addresses';
-      } catch (err) {
-        console.error(err);
-        archiveBtn.disabled = false;
-        const msg = err instanceof ApiError ? `${err.status}: ${err.body || err.statusText}` : err.message;
-        setError(errorEl, `Archive failed — ${msg}`);
-      }
+      api.patch(
+        `/addresses?id=eq.${encodeURIComponent(existing.id)}`,
+        { archived: nextArchived },
+        { intent: 'address_archive' },
+      );
+      window.__toast?.(nextArchived ? 'Address archived' : 'Address restored', { level: 'success' });
+      location.hash = '/addresses';
     });
   }
+}
+
+function cryptoRandomId() {
+  if (crypto?.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
 }
 
 // ── Shared form helpers ────────────────────────────────────────────────────
