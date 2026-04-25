@@ -451,6 +451,18 @@ a { color: var(--accent); text-decoration: none; }
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
+  /* iOS Safari paints a default underline on text that matches its
+     "could be a link" heuristic (e.g. "Yes", hyphenated tokens like
+     "Carry-on"). Force it off across all states. */
+  text-decoration: none;
+  -webkit-text-decoration: none;
+}
+.toggle-group button:hover,
+.toggle-group button:focus,
+.toggle-group button:active,
+.toggle-group button[aria-pressed="true"] {
+  text-decoration: none;
+  -webkit-text-decoration: none;
 }
 .toggle-group button[aria-pressed="true"] {
   background: var(--accent);
@@ -1022,7 +1034,14 @@ a { color: var(--accent); text-decoration: none; }
   margin-top: 4px;
   font-family: var(--font-mono);
   font-size: 11px;
+  color: var(--text);
+}
+.predict-sparkline-axis .predict-axis-key {
   color: var(--muted);
+  margin-right: 3px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .predict-breakdown {

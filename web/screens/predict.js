@@ -354,6 +354,18 @@ function humanDuration(seconds) {
   return m ? `${h}h ${m}m` : `${h}h`;
 }
 
+// Compact form for the sparkline axis where the role label (min/p50/p90/max)
+// already provides context — drop the "min" unit suffix that collides with
+// the "min" role label and read as "min 8 min".
+function shortDuration(seconds) {
+  if (seconds == null) return '';
+  const total = Math.round(seconds / 60);
+  if (total < 60) return `${total}m`;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return m ? `${h}h${m}m` : `${h}h`;
+}
+
 // Inline SVG sparkline of the duration distribution (sorted asc). Renders only
 // when sample_n ≥ 5; below that the brief calls out that distribution shape
 // is misleading.
@@ -379,10 +391,10 @@ function sparklineHtml(res) {
         <line x1="${p90X.toFixed(1)}" y1="0" x2="${p90X.toFixed(1)}" y2="${H}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2,2"/>
       </svg>
       <div class="predict-sparkline-axis">
-        <span>min ${escapeHtml(humanDuration(min))}</span>
-        <span>p50 ${escapeHtml(humanDuration(res.p50_s))}</span>
-        <span>p90 ${escapeHtml(humanDuration(res.p90_s))}</span>
-        <span>max ${escapeHtml(humanDuration(max))}</span>
+        <span><span class="predict-axis-key">min</span> ${escapeHtml(shortDuration(min))}</span>
+        <span><span class="predict-axis-key">p50</span> ${escapeHtml(shortDuration(res.p50_s))}</span>
+        <span><span class="predict-axis-key">p90</span> ${escapeHtml(shortDuration(res.p90_s))}</span>
+        <span><span class="predict-axis-key">max</span> ${escapeHtml(shortDuration(max))}</span>
       </div>
     </div>
   `;
