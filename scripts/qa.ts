@@ -16,6 +16,7 @@
 //   bun run qa eval '<js expr>'   # returns JSON.stringify(result)
 //   bun run qa state              # url + title + hash
 //   bun run qa console            # buffered console messages
+//   bun run qa offline on|off     # toggle Playwright network — for M8 airplane-mode tests
 //   bun run qa reload
 //   bun run qa show               # open visible window on the daemon's current page
 //   bun run qa stop               # kill daemon
@@ -85,6 +86,7 @@ function printHelp() {
     '  eval <js>                eval in page; prints JSON-stringified result',
     '  state                    url + title + hash',
     '  console                  buffered console messages (last 200)',
+    '  offline on|off           toggle network (Playwright setOffline)',
     '  show                     open visible window on the current page',
     '  stop                     kill daemon',
   ];
@@ -238,7 +240,7 @@ async function runDaemon() {
 
 async function runCmd(
   page: Page,
-  _ctx: BrowserContext,
+  ctx: BrowserContext,
   cmd: string,
   args: string[],
   consoleLogs: { type: string; text: string; ts: string }[],
@@ -313,6 +315,15 @@ async function runCmd(
       const ms = parseInt(args[0] ?? '500', 10);
       await page.waitForTimeout(ms);
       return `waited ${ms}ms`;
+    }
+
+    case 'offline': {
+      const mode = args[0];
+      if (mode !== 'on' && mode !== 'off') {
+        throw new Error('usage: offline on|off');
+      }
+      await ctx.setOffline(mode === 'on');
+      return `offline=${mode === 'on'}`;
     }
 
     default:
