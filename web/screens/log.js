@@ -10,6 +10,12 @@
 import { api, ApiError } from '../api.js';
 import { mountAirportPicker } from './airport-picker.js';
 import { getQueuedFor, getQueuedActiveTrip } from '../queue.js';
+import {
+  localInputValueToUtcIso,
+  utcIsoToLocalInputValue,
+  checkDst,
+  checkDstCode,
+} from '../dst.js';
 
 // ── Module-level state ─────────────────────────────────────────────────────
 
@@ -1058,84 +1064,6 @@ function formatLocalTime(iso, iata) {
   } catch {
     return new Date(iso).toLocaleTimeString();
   }
-}
-
-// Convert "YYYY-MM-DDTHH:mm" (in tz) → UTC ISO.
-function localInputValueToUtcIso(localStr, tz) {
-  // Parse as if local-naive then offset-correct via tz.
-  const [datePart, timePart] = localStr.split('T');
-  const [y, m, d] = datePart.split('-').map(Number);
-  const [hh, mm] = timePart.split(':').map(Number);
-  // Build a UTC instant for the same wall-clock; then subtract the tz offset
-  // at that instant.
-  const asUtc = Date.UTC(y, m - 1, d, hh, mm);
-  const offsetMs = tzOffsetMs(new Date(asUtc), tz);
-  return new Date(asUtc - offsetMs).toISOString();
-}
-
-function utcIsoToLocalInputValue(iso, tz) {
-  const d = new Date(iso);
-  // Use Intl to extract local parts.
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-    timeZone: tz,
-  }).formatToParts(d);
-  const map = {};
-  parts.forEach((p) => { if (p.type !== 'literal') map[p.type] = p.value; });
-  // Some locales return hour=24; normalize.
-  const hour = map.hour === '24' ? '00' : map.hour;
-  return `${map.year}-${map.month}-${map.day}T${hour}:${map.minute}`;
-}
-
-function tzOffsetMs(date, tz) {
-  // Difference between the same wall-clock in tz vs UTC, at the given instant.
-  const dtfTz = new Intl.DateTimeFormat('en-US', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-    timeZone: tz,
-  });
-  const parts = dtfTz.formatToParts(date);
-  const map = {};
-  parts.forEach((p) => { if (p.type !== 'literal') map[p.type] = p.value; });
-  const asIfUtc = Date.UTC(+map.year, +map.month - 1, +map.day,
-    +(map.hour === '24' ? '0' : map.hour), +map.minute, +map.second);
-  return asIfUtc - date.getTime();
-}
-
-// DST check: return null, 'spring_nonexistent', or 'fall_ambiguous'.
-function checkDstCode(dateStr, timeStr, tz) {
-  if (!dateStr || !timeStr || !tz) return null;
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const [hh, mm] = timeStr.split(':').map(Number);
-  // Test the instant 30 min before and after; if both map to the same wall
-  // clock differently, we're at a DST boundary.
-  const wallMs = Date.UTC(y, m - 1, d, hh, mm);
-  const offsetNow = tzOffsetMs(new Date(wallMs), tz);
-  const utcGuess  = wallMs - offsetNow;
-  const offsetCheck = tzOffsetMs(new Date(utcGuess), tz);
-  if (offsetNow !== offsetCheck) {
-    // Shifted — likely spring forward or fall back.
-    // If our wall time round-trips to a different wall, it's "non-existent".
-    const reUtcWallParts = new Intl.DateTimeFormat('en-CA', {
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz,
-    }).formatToParts(new Date(utcGuess));
-    const map = {};
-    reUtcWallParts.forEach((p) => { if (p.type !== 'literal') map[p.type] = p.value; });
-    const roundHh = +(map.hour === '24' ? '0' : map.hour);
-    const roundMm = +map.minute;
-    if (roundHh !== hh || roundMm !== mm) return 'spring_nonexistent';
-    return 'fall_ambiguous';
-  }
-  return null;
-}
-
-function checkDst(dateStr, timeStr, tz) {
-  const code = checkDstCode(dateStr, timeStr, tz);
-  if (code === 'spring_nonexistent') return 'this time does not exist on DST day (spring forward).';
-  if (code === 'fall_ambiguous') return 'this time is ambiguous on DST day (fall back).';
-  return null;
 }
 
 function cryptoRandomId() {
