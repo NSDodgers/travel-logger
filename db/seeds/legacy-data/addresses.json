@@ -1,0 +1,144 @@
+{
+  "addresses": [
+    {
+      "id": "home_192nd",
+      "label": "700 W 192nd St, New York NY 10040",
+      "role": "residence",
+      "validFrom": "2013-05-20",
+      "validTo": "2022-11-27",
+      "tz": "America/New_York",
+      "lat": 40.8537,
+      "lng": -73.9298
+    },
+    {
+      "id": "chicago_state",
+      "label": "108 N State St, Chicago IL 60602",
+      "role": "temp_stay",
+      "validFrom": "2022-02-07",
+      "validTo": "2022-04-06",
+      "tz": "America/Chicago",
+      "lat": 41.8836,
+      "lng": -87.6280
+    },
+    {
+      "id": "toronto_victoria",
+      "label": "210 Victoria St, Toronto ON M5B 2R3",
+      "role": "temp_stay",
+      "validFrom": "2022-04-10",
+      "validTo": "2022-06-20",
+      "tz": "America/Toronto",
+      "lat": 43.6566,
+      "lng": -79.3781
+    },
+    {
+      "id": "koln_vogelsanger",
+      "label": "Vogelsanger Str. 206, 50825 Köln, Germany",
+      "role": "temp_stay",
+      "validFrom": "2022-09-07",
+      "validTo": "2022-10-28",
+      "tz": "Europe/Berlin",
+      "lat": 50.9550,
+      "lng": 6.9050
+    },
+    {
+      "id": "home_bronx",
+      "label": "445 W 240th St, Bronx NY 10463",
+      "role": "residence",
+      "validFrom": "2022-11-28",
+      "validTo": "2026-02-15",
+      "tz": "America/New_York",
+      "lat": 40.8881,
+      "lng": -73.9144
+    },
+    {
+      "id": "boston_ames",
+      "label": "88 Ames St, Cambridge MA 02142",
+      "role": "temp_stay",
+      "validFrom": "2023-05-07",
+      "validTo": "2023-05-07",
+      "tz": "America/New_York",
+      "lat": 42.3625,
+      "lng": -71.0894
+    },
+    {
+      "id": "chicago_parkline",
+      "label": "60 E Randolph St, Chicago IL 60601",
+      "role": "temp_stay",
+      "validFrom": "2024-04-05",
+      "validTo": "2024-05-16",
+      "tz": "America/Chicago",
+      "lat": 41.8848,
+      "lng": -87.6259
+    },
+    {
+      "id": "chicago_grand",
+      "label": "369 W Grand Ave, Chicago IL 60654",
+      "role": "temp_stay",
+      "validFrom": "2024-08-13",
+      "validTo": "2024-08-25",
+      "tz": "America/Chicago",
+      "lat": 41.8917,
+      "lng": -87.6390
+    },
+    {
+      "id": "chicago_level",
+      "label": "1140 N Wells St, Chicago IL 60610",
+      "role": "temp_stay",
+      "validFrom": "2026-04-12",
+      "validTo": "2026-04-21",
+      "tz": "America/Chicago",
+      "lat": 41.9019,
+      "lng": -87.6342
+    },
+    {
+      "id": "home_inwood",
+      "label": "4778 Broadway, New York NY 10034",
+      "role": "residence",
+      "validFrom": "2026-02-16",
+      "validTo": null,
+      "tz": "America/New_York",
+      "lat": 40.8694,
+      "lng": -73.9220
+    },
+    {
+      "id": "mil_long_beach",
+      "label": "6246 E Monita St, Long Beach CA 90803",
+      "role": "recurring_visit",
+      "validFrom": null,
+      "validTo": null,
+      "tz": "America/Los_Angeles",
+      "lat": 33.7720,
+      "lng": -118.1380
+    },
+    {
+      "id": "mom_burbank",
+      "label": "619 Andover Dr, Burbank CA 91504",
+      "role": "recurring_visit",
+      "validFrom": null,
+      "validTo": null,
+      "tz": "America/Los_Angeles",
+      "lat": 34.2147,
+      "lng": -118.3120
+    },
+    {
+      "id": "steppenwolf",
+      "label": "1650 N Halsted St, Chicago IL 60614",
+      "role": "recurring_work_venue",
+      "validFrom": null,
+      "validTo": null,
+      "tz": "America/Chicago",
+      "lat": 41.9118,
+      "lng": -87.6486
+    },
+    {
+      "id": "art_cambridge",
+      "label": "64 Brattle St, Cambridge MA 02138",
+      "role": "recurring_work_venue",
+      "validFrom": null,
+      "validTo": null,
+      "tz": "America/New_York",
+      "lat": 42.3736,
+      "lng": -71.1190
+    }
+  ]
+}
