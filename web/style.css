@@ -244,6 +244,25 @@ a { color: var(--accent); text-decoration: none; }
   color: rgba(0,0,0,0.7);
 }
 
+/* M9: empty state stacks Dep + Arr heroes vertically. Each takes ~half the
+   viewport so both stay reachable on a one-handed phone tap. */
+.log-screen-empty {
+  grid-template-rows: 1fr 1fr;
+  gap: 12px;
+}
+.log-screen-empty .log-hero {
+  min-height: 0;            /* override single-hero 60dvh */
+  height: 100%;
+  font-size: 28px;
+}
+.log-screen-empty .log-hero-arr {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.log-screen-empty .log-hero-arr:active { background: var(--surface-2); }
+.log-screen-empty .log-hero-arr .log-hero-sub { color: var(--muted); }
+
 .log-grid {
   display: grid;
   grid-template-rows: 1fr auto;
@@ -704,6 +723,128 @@ a { color: var(--accent); text-decoration: none; }
   padding: 48px 24px;
   text-align: center;
   color: var(--muted);
+}
+
+/* ── History list + timeline (M9) ─────────────────────────────────────── */
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.history-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.history-row:active { background: var(--surface); }
+.history-row-route {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+.history-row-meta {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.history-row-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.history-row-chevron { color: var(--muted); font-size: 18px; }
+
+.history-source {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.history-source.src-app { color: var(--accent); border-color: var(--accent); }
+.history-source.src-legacy { color: var(--muted); border-color: var(--border); }
+
+.history-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 11px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.history-badge.in-progress { color: var(--accent); border: 1px solid var(--accent); }
+.history-badge.abandoned { color: var(--muted); border: 1px solid var(--border); }
+
+/* Trip timeline (single trip detail). */
+.trip-header {
+  padding: 12px 16px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.trip-header-line {
+  font-size: 15px;
+  color: var(--text);
+}
+.trip-header-meta {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 16px 0 24px 16px;
+  position: relative;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 23px;
+  top: 24px;
+  bottom: 24px;
+  width: 1px;
+  background: var(--border);
+}
+.timeline-row {
+  position: relative;
+  padding: 8px 16px 8px 28px;
+}
+.timeline-dot {
+  position: absolute;
+  left: 4px;
+  top: 14px;
+  width: 11px;
+  height: 11px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--bg);
+}
+.timeline-label {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+}
+.timeline-time {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.timeline-delta {
+  font-size: 12px;
+  color: var(--success);
+  margin-top: 2px;
 }
 
 /* ── Sync strip + dead-letter + auth modal (M8) ────────────────────────── */

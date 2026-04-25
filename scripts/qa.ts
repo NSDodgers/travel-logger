@@ -259,9 +259,10 @@ async function runCmd(
     }
 
     case 'screenshot': {
-      const path = args[0] ?? '/tmp/travel-qa.png';
-      await page.screenshot({ path, fullPage: true });
-      return `screenshot saved: ${path}`;
+      const fullPage = !args.includes('--viewport');
+      const path = args.find((a) => !a.startsWith('--')) ?? '/tmp/travel-qa.png';
+      await page.screenshot({ path, fullPage });
+      return `screenshot saved: ${path}${fullPage ? '' : ' (viewport)'}`;
     }
 
     case 'click': {
