@@ -10,7 +10,7 @@ _Last updated: 2026-04-24 after M4. Update this file at the end of each mileston
 | M2 | ✅ | Docker stack + Authelia (all 6 containers healthy) |
 | M3 | ✅ | `travel.myhometech.app` live, login works on iPhone |
 | M4 | ✅ | 5,515 airports seeded |
-| **M5** | **🟨 ready to load** | Historical import (231 trip rows generated). Run `./scripts/load-legacy.sh` to apply. See `docs/M5_INVENTORY.md` + `docs/M5_QUIZ*.md` |
+| M5 | ✅ | Historical import: 231 trips + 536 milestones loaded (2017-08 → 2026-04). See `docs/M5_INVENTORY.md` + `docs/M5_QUIZ*.md`; re-run via `./scripts/load-legacy.sh` |
 | M6–M13 | planned | See `implementation_plan.md` §8 |
 
 ## Currently running on Mac Studio
