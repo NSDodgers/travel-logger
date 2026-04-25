@@ -47,6 +47,8 @@ Local URL: **<http://127.0.0.1:8090>** (bypasses Cloudflare, still gated by Auth
 | Re-generate airports seed | `bun run db/seeds/generate-airports.ts` |
 | Re-load legacy data | `./scripts/load-legacy.sh` (idempotent — wipes + reloads `source='legacy'` rows) |
 | Re-generate legacy SQL only | `bun run db/seeds/import-legacy.ts` |
+| Browser-driven QA (one-time) | `bun run qa login` (sign in once to Authelia) |
+| Browser-driven QA (ongoing) | `bun run qa goto /#/addresses` / `bun run qa screenshot` / `bun run qa eval "{...}"` — see `scripts/qa.ts` header |
 
 ## Secrets inventory (on-disk, never in git)
 
@@ -92,6 +94,8 @@ Every file in `./secrets/` is `chmod 0600`, gitignored. Regenerated via `./scrip
 | `81bb543` | M6 address list view |
 | `f110cdc` | M6 add-address flow (Mapbox Search REST + static image) |
 | `0958667` | M6 edit + archive flows |
+| `4ead4a8` | M6 post-QA fixes (async render, header grid, /api strip, no-store) |
+| `e33e830` | QA driver — Playwright persistent profile (scripts/qa.ts) |
 
 Diff against `main` (what changed since last push): `git log --oneline origin/main..HEAD` — should be empty if everything's pushed.
 
@@ -103,6 +107,7 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 - `public.addresses` has no `updated_at` trigger. M6 edit/archive PATCHes bump it client-side so the list re-sorts. A proper BEFORE UPDATE trigger should land when we touch lifecycle plumbing in M7.
 - `web/icon.svg` is a placeholder (amber "T" on black). Nick can design real icons + an Apple-touch PNG before M11 "first real trip."
 - Mapbox token must have `https://travel.myhometech.app/*` and `http://127.0.0.1:8090/*` in its URL restriction before M6 is reachable end-to-end.
+- A Cloudflare Cache Rule bypasses CDN caching for `travel.myhometech.app` (see Rules → Cache Rules in the dashboard). Don't add aggressive caching headers without removing that rule first — the iteration loop depends on it.
 - No tests exist yet. Plan's §4 test diagram needs to start getting filled in alongside M7–M10.
 
 ## Schema additions from M5
