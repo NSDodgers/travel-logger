@@ -98,7 +98,7 @@ export async function predictScreen(root) {
               </option>
             `).join('')}
           </select>
-          <p class="hint" id="origin-hint">Used for today's traffic-aware drive estimate via Mapbox.</p>
+          <p class="hint" id="origin-hint">Used for a traffic-aware drive estimate at flight time via Mapbox.</p>
         </div>
 
         <div id="airport-slot"></div>
