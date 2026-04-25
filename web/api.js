@@ -148,4 +148,17 @@ export const api = {
     });
     return [body];
   },
+
+  // Synchronous request/response — predictions are not queued. The user is
+  // staring at the screen waiting for the answer. If the network fails or
+  // auth dies, we surface the error to the form rather than enqueuing.
+  async predict(body) {
+    const result = await fetchJSON('POST', '/predict', body);
+    if (result.ok) return result.data;
+    if (result.classification === AUTH_REQUIRED) {
+      location.href = '/auth/?rd=' + encodeURIComponent(location.href);
+      return null;
+    }
+    throw new ApiError(result.classification, result.classification, result.error);
+  },
 };

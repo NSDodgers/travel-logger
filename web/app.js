@@ -6,7 +6,7 @@
 // header and tab bar. Handlers receive (root, params) and render into <main>.
 
 import { logScreen } from './screens/log.js';
-import { predictScreen } from './screens/placeholder.js';
+import { predictScreen } from './screens/predict.js';
 import { historyListScreen, historyTimelineScreen } from './screens/history.js';
 import {
   addressesListScreen,
