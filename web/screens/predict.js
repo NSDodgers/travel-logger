@@ -15,8 +15,17 @@
 
 import { api, ApiError } from '../api.js';
 import { mountAirportPicker } from './airport-picker.js';
-import { checkDst } from '../dst.js';
+import { checkDst, localInputValueToUtcIso } from '../dst.js';
 import { drivingDirections } from '../mapbox.js';
+
+// Convert the form's local date+time to a UTC epoch ms via the airport's
+// tz. Returns null when any piece is missing.
+function computeFlightUtcMs(d) {
+  if (!d.flight_date || !d.flight_time || !d.airport?.tz) return null;
+  const iso = localInputValueToUtcIso(`${d.flight_date}T${d.flight_time}`, d.airport.tz);
+  const ms = new Date(iso).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
 
 // Module-level draft so values survive re-renders within a single visit.
 let draft = null;
@@ -281,6 +290,16 @@ function bindSubmit(root) {
       // here we kick off the Mapbox call optimistically with the airport
       // we already picked client-side, since its coords were loaded by the
       // airport-picker via api.airports.
+      //
+      // depart_at: We want a typical-traffic estimate for *when the user is
+      // actually driving*, not for "now." For a flight 2 days out, the
+      // current Saturday-evening traffic is meaningless. Approximate the
+      // drive moment as flight_time minus 90 minutes — close enough since
+      // Mapbox's typical-traffic patterns aren't minute-granular. Clamp
+      // to "now+5min" minimum (depart_at must be in the future) and skip
+      // the parameter entirely if the flight is more than ~30 days out
+      // (Mapbox doesn't keep typical-traffic data that far ahead).
+      let driveDepartAt = null;
       let drivePromise = Promise.resolve(null);
       if (origin && draft.transit === 'car' && draft.airport.lat != null && draft.airport.lng != null) {
         const [oLng, oLat] = [origin.lng, origin.lat];
@@ -289,7 +308,25 @@ function bindSubmit(root) {
         // semantically by Mapbox terms — we just swap the two endpoints).
         const from = draft.direction === 'departure' ? [oLng, oLat] : [aLng, aLat];
         const to   = draft.direction === 'departure' ? [aLng, aLat] : [oLng, oLat];
-        drivePromise = drivingDirections(from[0], from[1], to[0], to[1]).catch((err) => {
+
+        // Compute the depart_at. For departures: flight_time - 90min (when
+        // they're driving TO the airport). For arrivals: flight_time +
+        // airport_p90_guess (when they'll be done at airport and start
+        // driving home — we don't have airport_p90 yet, use 30min default).
+        const flightUtcMs = computeFlightUtcMs(draft);
+        if (flightUtcMs) {
+          const offsetMin = draft.direction === 'departure' ? -90 : 30;
+          let candidate = flightUtcMs + offsetMin * 60 * 1000;
+          const now = Date.now();
+          // depart_at must be in the future.
+          if (candidate < now + 5 * 60 * 1000) candidate = now + 5 * 60 * 1000;
+          // Mapbox typical-traffic doesn't extend more than ~30 days out.
+          if (candidate < now + 30 * 24 * 60 * 60 * 1000) {
+            driveDepartAt = new Date(candidate);
+          }
+        }
+
+        drivePromise = drivingDirections(from[0], from[1], to[0], to[1], { departAt: driveDepartAt }).catch((err) => {
           console.warn('Mapbox directions failed; falling back to historical drive', err);
           return null;
         });
@@ -298,9 +335,12 @@ function bindSubmit(root) {
       const [res, drive] = await Promise.all([predictPromise, drivePromise]);
       // Race guard: if a faster click already replaced us, drop this result.
       if (token !== inflightToken) return;
+      // Stamp the depart_at on the drive result so the renderer can label
+      // the row honestly (e.g. "Drive at Tue 7:35 AM" vs "Right now").
+      const driveWithMeta = drive ? { ...drive, depart_at: driveDepartAt } : null;
       lastResult = res;
-      lastDrive = drive;
-      renderResult(root, res, drive);
+      lastDrive = driveWithMeta;
+      renderResult(root, res, driveWithMeta);
     } catch (err) {
       if (token !== inflightToken) return;
       const msg = err instanceof ApiError ? err.error || `${err.status}` : err.message;
@@ -391,11 +431,18 @@ function renderResult(root, res, drive) {
   // Sparkline: only when full-trip sample is large (low N is misleading).
   const sparkline = res.kind === 'full' ? sparklineHtml(res) : '';
 
+  // Source tag for the delta line. "typical traffic" when Mapbox used
+  // depart_at (estimate is for the actual driving time). "live drive"
+  // when Mapbox returned real-time traffic at the request moment.
+  const heroSourceTag = heroSource === 'live'
+    ? (drive?.depart_at ? ' · typical traffic' : ' · live drive')
+    : '';
+
   slot.innerHTML = `
     <div class="predict-card predict-${res.kind}">
       <div class="predict-hero-label">${escapeHtml(heroLabel)}</div>
       <div class="predict-hero-time">${escapeHtml(heroTime)}</div>
-      <div class="predict-hero-delta">${escapeHtml(heroDelta)} ${flightLabel}${heroSource === 'live' ? ' · live drive' : ''}</div>
+      <div class="predict-hero-delta">${escapeHtml(heroDelta)} ${flightLabel}${heroSourceTag}</div>
       ${comfortable}
       ${segmentsBlock}
       ${sparkline}
@@ -445,12 +492,22 @@ function segmentsHtml(res, drive) {
   const driveLabel   = dep ? 'Drive (home → airport)' : 'Drive (airport → destination)';
   const airportLabel = dep ? 'At airport' : 'At airport';
 
+  // Drive label honestly reflects when the estimate is for. With a
+  // depart_at, Mapbox returns typical-traffic for that future moment
+  // ("Tue 7:35 AM is typically X min"). Without one, it returns
+  // real-time traffic at the API call moment.
+  const driveTimeLabel = drive?.depart_at
+    ? `Drive at ${escapeHtml(formatLocal(new Date(drive.depart_at), res.airport.tz))}`
+    : `Drive right now`;
+  const driveAuxLabel = drive?.depart_at
+    ? `Mapbox typical · ${(drive.distance_m / 1000).toFixed(1)} km`
+    : `Mapbox live · ${(drive.distance_m / 1000).toFixed(1)} km`;
   const liveRow = drive
     ? `
       <div class="predict-segment-row predict-segment-live">
-        <span class="predict-segment-key">Today's drive</span>
+        <span class="predict-segment-key">${driveTimeLabel}</span>
         <span class="predict-segment-val">${escapeHtml(humanDuration(drive.duration_s))}</span>
-        <span class="predict-segment-aux">Mapbox · ${(drive.distance_m / 1000).toFixed(1)} km</span>
+        <span class="predict-segment-aux">${driveAuxLabel}</span>
       </div>
     `
     : '';

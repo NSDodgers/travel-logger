@@ -67,23 +67,34 @@ export async function retrieve(mapboxId, sessionToken) {
 
 /**
  * Mapbox Directions — driving-traffic profile, traffic-aware ETA from
- * origin → destination. Returns the live drive duration in seconds (and the
- * route distance in meters for context). Used by the Predict tab to anchor
- * the leave-by time on today's traffic instead of a historical average.
+ * origin → destination. Returns the drive duration in seconds (and the
+ * route distance in meters for context).
+ *
+ * When `departAt` is omitted, the response uses real-time traffic
+ * (whatever is happening at the API call moment). When `departAt` is a
+ * future Date, Mapbox returns a typical-traffic estimate for that time
+ * — equivalent to Google Maps' "Depart at..." prediction, computed from
+ * Mapbox's pattern data. Use that for any flight more than a few hours
+ * out; "right now" traffic for a Tuesday morning when you're predicting
+ * on Saturday evening is actively misleading.
  *
  * Caller is responsible for showing a fallback when this throws (no
- * network, Mapbox down, missing token, etc.) — usually fall back to the
- * historical drive p90.
+ * network, Mapbox down, missing token, depart_at too far out, etc.) —
+ * usually fall back to the historical drive p90.
  *
  * Docs: https://docs.mapbox.com/api/navigation/directions/
  */
-export async function drivingDirections(originLng, originLat, destLng, destLat) {
+export async function drivingDirections(originLng, originLat, destLng, destLat, { departAt } = {}) {
   const coords = `${originLng},${originLat};${destLng},${destLat}`;
   const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coords}`);
   url.searchParams.set('access_token', token());
   url.searchParams.set('overview', 'false');         // we only need the duration, not the geometry
   url.searchParams.set('alternatives', 'false');
   url.searchParams.set('annotations', 'duration');
+  if (departAt instanceof Date && !isNaN(departAt.getTime())) {
+    // Mapbox accepts ISO 8601 in UTC. Drop the milliseconds for a cleaner URL.
+    url.searchParams.set('depart_at', departAt.toISOString().replace(/\.\d+Z$/, 'Z'));
+  }
 
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Mapbox directions ${res.status}: ${await res.text()}`);
