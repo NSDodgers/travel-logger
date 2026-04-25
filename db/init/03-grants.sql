@@ -37,7 +37,9 @@ grant select on public.milestones     to predict_user;
 grant select on public.airports       to predict_user;
 grant select on public.milestone_kinds to predict_user;
 grant select on public.addresses      to predict_user;
-grant insert, update on public.predictions to predict_user;
+grant insert, update, select on public.predictions to predict_user;
+-- SELECT on predictions: needed for INSERT...RETURNING (M10) and calibration
+-- scoring reads (M13).
 
 -- ─── Future tables inherit the same pattern ──────────────────────────────
 -- Any new table added later needs matching grants; enforce via a review checklist,
