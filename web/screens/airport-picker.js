@@ -50,8 +50,28 @@ export function mountAirportPicker(slot, opts) {
       // Limit 8 — keep dropdown short on phone.
       const upperQ = q.toUpperCase();
       const safeQ = q.replace(/[*,()]/g, '');
-      const path = `/airports?or=(iata.eq.${encodeURIComponent(upperQ)},iata.ilike.${encodeURIComponent(upperQ + '*')},name.ilike.${encodeURIComponent('*' + safeQ + '*')},city.ilike.${encodeURIComponent('*' + safeQ + '*')})&limit=8&order=iata.asc`;
-      const rows = await api.get(path);
+      const broadPath = `/airports?or=(iata.eq.${encodeURIComponent(upperQ)},iata.ilike.${encodeURIComponent(upperQ + '*')},name.ilike.${encodeURIComponent('*' + safeQ + '*')},city.ilike.${encodeURIComponent('*' + safeQ + '*')})&limit=8&order=iata.asc`;
+      // 3-letter queries that look like an IATA also get an explicit
+      // iata=eq.<Q> lookup. The broad query orders by iata.asc with limit=8,
+      // which can drown the exact IATA when many airport names happen to
+      // contain the same letters (e.g. "ORD" loses to BOD/Bordeaux,
+      // BMW/Bordj, etc.). The exact lookup runs in parallel and is merged
+      // ahead of the broad results so the user always sees the airport
+      // they typed.
+      const promises = [api.get(broadPath)];
+      if (upperQ.length === 3 && /^[A-Z]{3}$/.test(upperQ)) {
+        promises.push(api.get(`/airports?iata=eq.${encodeURIComponent(upperQ)}&limit=1`));
+      }
+      const [broadRows, exactRows] = await Promise.all(promises);
+      const seen = new Set();
+      const merged = [];
+      for (const a of (Array.isArray(exactRows) ? exactRows : [])) {
+        if (!seen.has(a.iata)) { seen.add(a.iata); merged.push(a); }
+      }
+      for (const a of (Array.isArray(broadRows) ? broadRows : [])) {
+        if (!seen.has(a.iata)) { seen.add(a.iata); merged.push(a); }
+      }
+      const rows = merged;
       // Re-rank client-side: exact IATA, then IATA prefix, then alpha by IATA.
       // PostgREST can't express this priority order natively without RPCs.
       const ranked = (Array.isArray(rows) ? rows : []).slice().sort((a, b) => {
