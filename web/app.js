@@ -5,7 +5,8 @@
 // Each route handler returns a `chrome` descriptor the shell applies to the
 // header and tab bar. Handlers receive (root, params) and render into <main>.
 
-import { logScreen, predictScreen, historyScreen } from './screens/placeholder.js';
+import { logScreen } from './screens/log.js';
+import { predictScreen, historyScreen } from './screens/placeholder.js';
 import {
   addressesListScreen,
   addressAddScreen,
@@ -105,10 +106,28 @@ async function render() {
 // ── Toast ──────────────────────────────────────────────────────────────────
 
 let toastTimer = null;
-export function toast(msg, { level = 'info', ms = 2400 } = {}) {
-  toastEl.textContent = msg;
+export function toast(msg, { level = 'info', ms = 2400, action = null } = {}) {
   toastEl.dataset.level = level;
   toastEl.hidden = false;
+
+  // Build content. If an action is provided, we render the message + a button
+  // that fires the callback once and then hides the toast.
+  if (action) {
+    toastEl.textContent = msg + ' ';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'toast-action';
+    btn.textContent = action.label;
+    btn.addEventListener('click', () => {
+      clearTimeout(toastTimer);
+      toastEl.hidden = true;
+      try { action.onClick(); } catch (err) { console.error(err); }
+    });
+    toastEl.appendChild(btn);
+  } else {
+    toastEl.textContent = msg;
+  }
+
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { toastEl.hidden = true; }, ms);
 }
