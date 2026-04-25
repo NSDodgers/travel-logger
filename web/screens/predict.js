@@ -1,4 +1,4 @@
-// Predict tab — M10. Form mirrors the trip-start sheet (toggle groups + airport
+// Predict tab. Form mirrors the trip-start sheet (toggle groups + airport
 // picker + DST-validated date/time). Submit hits the Bun service at
 // /api/predict; result card always surfaces sample composition (per Nick's
 // 2026-04-25 decision: "always surface an explanation of what data is being
@@ -7,15 +7,23 @@
 // Filter widening drops in this order: tsa_precheck → party → transit → bags.
 // Airport and international are hard filters and never relax — see
 // project_m10_decisions.md.
+//
+// M14: Origin address picker + Mapbox Directions live drive time. Result
+// card shows three numbers side by side — today's traffic-aware drive,
+// historical drive percentile, historical airport percentile — and anchors
+// the leave-by on (live drive + airport p90). User picks which to trust.
 
 import { api, ApiError } from '../api.js';
 import { mountAirportPicker } from './airport-picker.js';
 import { checkDst } from '../dst.js';
+import { drivingDirections } from '../mapbox.js';
 
 // Module-level draft so values survive re-renders within a single visit.
 let draft = null;
 let lastResult = null;
+let lastDrive = null;       // { duration_s, distance_m } from Mapbox; null if no origin or call failed
 let inflightToken = 0;
+let cachedAddresses = null; // populated on first form mount
 
 function defaultDraft() {
   const now = new Date();
@@ -29,7 +37,8 @@ function defaultDraft() {
   const mi = String(dflt.getMinutes()).padStart(2, '0');
   return {
     direction: 'departure',
-    airport: null,           // {iata, name, city, tz}
+    airport: null,           // {iata, name, city, tz, lat, lng}
+    origin_id: null,         // address row id; null = no live drive lookup
     bags: 'carry_on',
     party: 'solo',
     transit: 'car',
@@ -43,6 +52,21 @@ function defaultDraft() {
 export async function predictScreen(root) {
   if (!draft) draft = defaultDraft();
 
+  // Load saved addresses once per session so we can offer them as origins.
+  // Order by updated_at desc so the most-recent address is at the top.
+  if (!cachedAddresses) {
+    try {
+      const rows = await api.get('/addresses?archived=eq.false&order=updated_at.desc');
+      cachedAddresses = Array.isArray(rows) ? rows : [];
+    } catch {
+      cachedAddresses = [];
+    }
+  }
+  // Default origin: first (most-recent) saved address, when one exists.
+  if (!draft.origin_id && cachedAddresses.length) {
+    draft.origin_id = cachedAddresses[0].id;
+  }
+
   root.innerHTML = `
     <section class="screen predict-screen">
       <form class="form" id="predict-form" novalidate>
@@ -53,6 +77,19 @@ export async function predictScreen(root) {
             <button type="button" data-value="arrival">Arrival</button>
           </div>
           <p class="hint" id="direction-hint"></p>
+        </div>
+
+        <div class="form-row">
+          <label for="origin-select" id="origin-label">Origin address</label>
+          <select id="origin-select">
+            <option value="">— Skip live drive time —</option>
+            ${cachedAddresses.map((a) => `
+              <option value="${escapeHtml(a.id)}" ${a.id === draft.origin_id ? 'selected' : ''}>
+                ${escapeHtml(a.label)}
+              </option>
+            `).join('')}
+          </select>
+          <p class="hint" id="origin-hint">Used for today's traffic-aware drive estimate via Mapbox.</p>
         </div>
 
         <div id="airport-slot"></div>
@@ -116,13 +153,22 @@ export async function predictScreen(root) {
   bindToggles(root);
   bindAirport(root);
   bindDateTime(root);
+  bindOrigin(root);
   bindSubmit(root);
   applyDirectionLabel(root);
 
   // Re-render any cached result so Predict tab keeps state across navigation.
-  if (lastResult) renderResult(root, lastResult);
+  if (lastResult) renderResult(root, lastResult, lastDrive);
 
   return { title: 'Predict', tab: 'predict', primary: null };
+}
+
+function bindOrigin(root) {
+  const sel = root.querySelector('#origin-select');
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    draft.origin_id = sel.value || null;
+  });
 }
 
 // ── Form bindings ───────────────────────────────────────────────────────
@@ -148,12 +194,15 @@ function bindToggles(root) {
 function applyDirectionLabel(root) {
   const labelEl = root.querySelector('#flight-time-label');
   const hintEl = root.querySelector('#direction-hint');
+  const originLabel = root.querySelector('#origin-label');
   if (draft.direction === 'departure') {
     labelEl.textContent = 'Scheduled departure (local)';
     hintEl.textContent = '"Leave by" answers when to leave home.';
+    if (originLabel) originLabel.textContent = 'Origin address';
   } else {
     labelEl.textContent = 'Scheduled landing (local)';
     hintEl.textContent = '"Arrive by" answers when you\'ll reach the destination.';
+    if (originLabel) originLabel.textContent = 'Destination address';
   }
 }
 
@@ -205,7 +254,16 @@ function bindSubmit(root) {
     btn.textContent = 'Predicting…';
     const token = ++inflightToken;
     try {
-      const res = await api.predict({
+      // Resolve the chosen origin address row (if any) — gives us coords
+      // for the Mapbox directions call. Only relevant for transit=car;
+      // Mapbox doesn't do public transit (we chose Mapbox over Google Maps
+      // to avoid GCP billing — see project_decisions.md).
+      const origin = draft.origin_id
+        ? cachedAddresses?.find((a) => a.id === draft.origin_id) ?? null
+        : null;
+
+      // Kick off prediction + (optional) Mapbox in parallel.
+      const predictPromise = api.predict({
         direction: draft.direction,
         airport: draft.airport.iata,
         bags: draft.bags,
@@ -216,10 +274,33 @@ function bindSubmit(root) {
         flight_time_local: draft.flight_time,
         flight_date_local: draft.flight_date,
       });
+
+      // Drive direction depends on dep vs arr. For departures, route is
+      // origin → dep_airport. For arrivals, airport → destination. The
+      // service returns the airport's coords on the response.airport field;
+      // here we kick off the Mapbox call optimistically with the airport
+      // we already picked client-side, since its coords were loaded by the
+      // airport-picker via api.airports.
+      let drivePromise = Promise.resolve(null);
+      if (origin && draft.transit === 'car' && draft.airport.lat != null && draft.airport.lng != null) {
+        const [oLng, oLat] = [origin.lng, origin.lat];
+        const [aLng, aLat] = [draft.airport.lng, draft.airport.lat];
+        // For arrivals, route runs airport → destination (still origin→airport
+        // semantically by Mapbox terms — we just swap the two endpoints).
+        const from = draft.direction === 'departure' ? [oLng, oLat] : [aLng, aLat];
+        const to   = draft.direction === 'departure' ? [aLng, aLat] : [oLng, oLat];
+        drivePromise = drivingDirections(from[0], from[1], to[0], to[1]).catch((err) => {
+          console.warn('Mapbox directions failed; falling back to historical drive', err);
+          return null;
+        });
+      }
+
+      const [res, drive] = await Promise.all([predictPromise, drivePromise]);
       // Race guard: if a faster click already replaced us, drop this result.
       if (token !== inflightToken) return;
       lastResult = res;
-      renderResult(root, res);
+      lastDrive = drive;
+      renderResult(root, res, drive);
     } catch (err) {
       if (token !== inflightToken) return;
       const msg = err instanceof ApiError ? err.error || `${err.status}` : err.message;
@@ -238,7 +319,7 @@ function bindSubmit(root) {
 
 // ── Result rendering ────────────────────────────────────────────────────
 
-function renderResult(root, res) {
+function renderResult(root, res, drive) {
   const slot = root.querySelector('#predict-result');
   if (!slot) return;
   slot.hidden = false;
@@ -254,36 +335,186 @@ function renderResult(root, res) {
     return;
   }
 
-  // Both low_n and full share the hero "leave by / arrive by" structure.
-  const heroLabel = res.direction === 'departure' ? 'Leave by' : 'Arrive by';
-  const heroTime = res.leave_by_local ?? '—';
-  const heroDelta = res.leave_by_offset_s != null ? humanDuration(res.leave_by_offset_s) : '';
+  // When we have a live Mapbox drive estimate AND an airport-segment p90
+  // from history, anchor the leave-by on (live drive + airport p90) instead
+  // of the historical full-trip p90. This gives Nick today's traffic, not
+  // a Tuesday from 2019.
   const flightLabel = res.direction === 'departure' ? 'before flight' : 'after landing';
+  const heroLabel   = res.direction === 'departure' ? 'Leave by'      : 'Arrive by';
+  const sign        = res.direction === 'departure' ? -1              : 1;
 
-  // Comfortable line: only when full sample.
-  const comfortable = (res.kind === 'full' && res.comfortable_local)
-    ? `
+  const airportSeg = res.segments?.airport;
+  const liveAvailable = drive && airportSeg?.p90_s != null;
+  let heroOffsetS, heroSource;
+  if (liveAvailable) {
+    heroOffsetS = drive.duration_s + airportSeg.p90_s;
+    heroSource = 'live';                    // live drive + history airport
+  } else {
+    heroOffsetS = res.leave_by_offset_s;
+    heroSource = 'history';                 // pure history fallback
+  }
+
+  const flightUtc = new Date(res.flight_utc).getTime();
+  const heroDate  = heroOffsetS != null ? new Date(flightUtc + sign * heroOffsetS * 1000) : null;
+  const heroTime  = heroDate ? formatLocal(heroDate, res.airport.tz) : '—';
+  const heroDelta = heroOffsetS != null ? humanDuration(heroOffsetS) : '';
+
+  // Comfortable line: live drive + airport p50 (when both exist), else
+  // historical full-trip p50 (when full sample), else hidden.
+  let comfortable = '';
+  if (liveAvailable && airportSeg.p50_s != null) {
+    const offS = drive.duration_s + airportSeg.p50_s;
+    const cDate = new Date(flightUtc + sign * offS * 1000);
+    comfortable = `
+      <div class="predict-comfortable">
+        <span class="predict-comfortable-label">Comfortable:</span>
+        <span class="predict-comfortable-time">${escapeHtml(formatLocal(cDate, res.airport.tz))}</span>
+        <span class="predict-comfortable-delta">(${escapeHtml(humanDuration(offS))} ${flightLabel})</span>
+      </div>
+    `;
+  } else if (res.kind === 'full' && res.comfortable_local) {
+    comfortable = `
       <div class="predict-comfortable">
         <span class="predict-comfortable-label">Comfortable:</span>
         <span class="predict-comfortable-time">${escapeHtml(res.comfortable_local)}</span>
         <span class="predict-comfortable-delta">(${escapeHtml(humanDuration(res.comfortable_offset_s))} ${flightLabel})</span>
       </div>
-    `
-    : '';
+    `;
+  }
 
-  // Sparkline: only when full sample (low N is misleading per brief).
+  // Side-by-side breakdown of drive + airport so Nick can see what each
+  // half contributes. When live drive isn't available, show the historical
+  // drive percentile prominently with a "no live drive — using history"
+  // hint at the bottom.
+  const segmentsBlock = segmentsHtml(res, drive);
+
+  // Sparkline: only when full-trip sample is large (low N is misleading).
   const sparkline = res.kind === 'full' ? sparklineHtml(res) : '';
 
   slot.innerHTML = `
     <div class="predict-card predict-${res.kind}">
       <div class="predict-hero-label">${escapeHtml(heroLabel)}</div>
       <div class="predict-hero-time">${escapeHtml(heroTime)}</div>
-      <div class="predict-hero-delta">${escapeHtml(heroDelta)} ${flightLabel}</div>
+      <div class="predict-hero-delta">${escapeHtml(heroDelta)} ${flightLabel}${heroSource === 'live' ? ' · live drive' : ''}</div>
       ${comfortable}
+      ${segmentsBlock}
       ${sparkline}
       ${breakdownHtml(res)}
+      <div class="predict-actions">
+        <button type="button" class="btn btn-primary" id="start-trip-from-predict">
+          Start this trip →
+        </button>
+        <p class="hint">Opens the trip-start sheet with these values pre-filled.</p>
+      </div>
     </div>
   `;
+  // Wire the handoff button. Clicking jumps to /log and opens the
+  // trip-start sheet (or arrival-start sheet) with our form values
+  // already populated. The user only fills in the bits Predict didn't
+  // need: arrival airport (for departures), sched arr time, etc.
+  root.querySelector('#start-trip-from-predict')?.addEventListener('click', () => {
+    const handoff = {
+      direction: draft.direction,
+      airport: draft.airport,
+      origin_id: draft.origin_id,
+      bags: draft.bags,
+      party: draft.party,
+      transit: draft.transit,
+      tsa_precheck: draft.tsa_precheck,
+      international: draft.international,
+      sched_dep_date: draft.flight_date,
+      sched_dep_time: draft.flight_time,
+    };
+    // Stash on window so log.js can read it on mount. Module-state would be
+    // cleaner but log.js doesn't import predict.js (and we don't want it to
+    // — circular imports are a smell). The window slot is read-once and
+    // cleared by log.js after consumption.
+    window.__predictHandoff = handoff;
+    location.hash = '/log';
+  });
+}
+
+// Drive vs airport breakdown. Always shows historical drive percentiles; if
+// the Mapbox call returned a live ETA, shows that as a third row alongside.
+function segmentsHtml(res, drive) {
+  const dep = res.direction === 'departure';
+  const driveSeg   = res.segments?.drive   ?? null;
+  const airportSeg = res.segments?.airport ?? null;
+  if (!driveSeg && !airportSeg && !drive) return '';
+
+  const driveLabel   = dep ? 'Drive (home → airport)' : 'Drive (airport → destination)';
+  const airportLabel = dep ? 'At airport' : 'At airport';
+
+  const liveRow = drive
+    ? `
+      <div class="predict-segment-row predict-segment-live">
+        <span class="predict-segment-key">Today's drive</span>
+        <span class="predict-segment-val">${escapeHtml(humanDuration(drive.duration_s))}</span>
+        <span class="predict-segment-aux">Mapbox · ${(drive.distance_m / 1000).toFixed(1)} km</span>
+      </div>
+    `
+    : '';
+
+  const driveHistRow = driveSeg && driveSeg.sample_n > 0
+    ? `
+      <div class="predict-segment-row">
+        <span class="predict-segment-key">${escapeHtml(driveLabel)}, history</span>
+        <span class="predict-segment-val">p50 ${escapeHtml(shortDuration(driveSeg.p50_s))} · p90 ${escapeHtml(shortDuration(driveSeg.p90_s))}</span>
+        <span class="predict-segment-aux">${driveSeg.sample_n} trip${driveSeg.sample_n === 1 ? '' : 's'}${driveSeg.relaxed_filters.length ? ' · relaxed: ' + driveSeg.relaxed_filters.map(prettyFilterName).join(', ') : ''}</span>
+      </div>
+    `
+    : !drive
+    ? `
+      <div class="predict-segment-row predict-segment-empty">
+        <span class="predict-segment-key">${escapeHtml(driveLabel)}, history</span>
+        <span class="predict-segment-val">—</span>
+        <span class="predict-segment-aux">no matching trips with both legs logged</span>
+      </div>
+    `
+    : '';
+
+  const airportRow = airportSeg && airportSeg.sample_n > 0
+    ? `
+      <div class="predict-segment-row">
+        <span class="predict-segment-key">${escapeHtml(airportLabel)}, history</span>
+        <span class="predict-segment-val">p50 ${escapeHtml(shortDuration(airportSeg.p50_s))} · p90 ${escapeHtml(shortDuration(airportSeg.p90_s))}</span>
+        <span class="predict-segment-aux">${airportSeg.sample_n} trip${airportSeg.sample_n === 1 ? '' : 's'}${airportSeg.relaxed_filters.length ? ' · relaxed: ' + airportSeg.relaxed_filters.map(prettyFilterName).join(', ') : ''}</span>
+      </div>
+    `
+    : `
+      <div class="predict-segment-row predict-segment-empty">
+        <span class="predict-segment-key">${escapeHtml(airportLabel)}, history</span>
+        <span class="predict-segment-val">—</span>
+        <span class="predict-segment-aux">no airport-side milestone gaps to measure</span>
+      </div>
+    `;
+
+  const fallbackHint = !drive && (airportSeg?.sample_n ?? 0) > 0
+    ? `<p class="predict-segment-hint">No live drive estimate — pick an origin address and set Transit to Car for today's traffic-aware ETA.</p>`
+    : '';
+
+  return `
+    <div class="predict-segments">
+      ${liveRow}
+      ${driveHistRow}
+      ${airportRow}
+      ${fallbackHint}
+    </div>
+  `;
+}
+
+// Format a UTC Date in the airport's tz the same way the predict service
+// does on the wire. Matches "Apr 27, 8:11 AM".
+function formatLocal(d, tz) {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+      timeZone: tz,
+    }).format(d);
+  } catch {
+    return d.toLocaleString();
+  }
 }
 
 function breakdownHtml(res) {

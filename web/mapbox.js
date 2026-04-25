@@ -65,6 +65,34 @@ export async function retrieve(mapboxId, sessionToken) {
   return { mapbox_id: mapboxId, formatted, lat, lng };
 }
 
+/**
+ * Mapbox Directions — driving-traffic profile, traffic-aware ETA from
+ * origin → destination. Returns the live drive duration in seconds (and the
+ * route distance in meters for context). Used by the Predict tab to anchor
+ * the leave-by time on today's traffic instead of a historical average.
+ *
+ * Caller is responsible for showing a fallback when this throws (no
+ * network, Mapbox down, missing token, etc.) — usually fall back to the
+ * historical drive p90.
+ *
+ * Docs: https://docs.mapbox.com/api/navigation/directions/
+ */
+export async function drivingDirections(originLng, originLat, destLng, destLat) {
+  const coords = `${originLng},${originLat};${destLng},${destLat}`;
+  const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coords}`);
+  url.searchParams.set('access_token', token());
+  url.searchParams.set('overview', 'false');         // we only need the duration, not the geometry
+  url.searchParams.set('alternatives', 'false');
+  url.searchParams.set('annotations', 'duration');
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Mapbox directions ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  const route = data.routes?.[0];
+  if (!route) throw new Error('Mapbox directions: no route returned');
+  return { duration_s: Math.round(route.duration), distance_m: Math.round(route.distance) };
+}
+
 /** Static map image URL for pin confirmation. */
 export function staticMapUrl(lat, lng, { width = 600, height = 400, zoom = 15 } = {}) {
   const pin = `pin-s+FF9F0A(${lng},${lat})`;
