@@ -11,8 +11,8 @@ _Last updated: 2026-04-24 after M6. Update this file at the end of each mileston
 | M3 | ✅ | `travel.myhometech.app` live, login works on iPhone |
 | M4 | ✅ | 5,515 airports seeded |
 | M5 | ✅ | Historical import: 231 trips + 536 milestones loaded (2017-08 → 2026-04). 14 addresses, 8 sources reconciled. See `docs/M5_INVENTORY.md` + `docs/M5_QUIZ*.md`; re-run via `./scripts/load-legacy.sh` |
-| M6 | ✅ | PWA shell + address book. 14 legacy labels renamed to human-readable. Mapbox Search REST + static-image pin; add/edit/archive wired through PostgREST. Caddy shim exposes `/config.js` from the `mapbox_token` secret at startup. See `docs/M6_BRIEF.md` for spec. |
-| **M7** | **⏳ next** | Log grid + edit/undo + departure flow. See `implementation_plan.md` §8. |
+| M6 | ✅ | PWA shell + address book. 14 legacy labels renamed to human-readable. Mapbox Search REST + static-image pin; add/edit/archive wired through PostgREST. Caddy shim exposes `/config.js` from the `mapbox_token` secret at startup. Cloudflare cache bypassed for the hostname so iteration loop stays fast. QA driver added (`scripts/qa.ts`, Playwright persistent profile). See `docs/M6_BRIEF.md` for spec. |
+| **M7** | **⏳ next** | Log grid + edit/undo + departure flow. See `docs/M7_BRIEF.md`. |
 | M8–M13 | planned | See `implementation_plan.md` §8 |
 
 ## Currently running on Mac Studio
@@ -132,8 +132,11 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 ## If Claude is starting a fresh session
 
 1. Read this file first.
-2. Read `implementation_plan.md` — the canonical plan (M7 details in §8, UI spec in §10, log grid in §10).
-3. Read `CLAUDE.md` — project brief + skill routing.
-4. Memory at `~/.claude/projects/-Users-nicksolyom-Code-travel-logger/memory/MEMORY.md` has cross-session context (decisions, gotchas).
-5. M6 reference (UI spec, shell structure): `docs/M6_BRIEF.md`, `web/app.js` (hash router), `web/screens/`.
-6. M5 reference (only if historical data context is needed): `docs/M5_INVENTORY.md`, `docs/M5_QUIZ.md`, `docs/M5_QUIZ_2.md`.
+2. Read `docs/M7_BRIEF.md` — the next milestone's full spec, decision points, deliverables.
+3. Read `implementation_plan.md` — the canonical plan (Flow A/B in §7, milestones in §8, UI spec in §10).
+4. Read `CLAUDE.md` — project brief + skill routing.
+5. Memory at `~/.claude/projects/-Users-nicksolyom-Library-Mobile-Documents-com-apple-CloudDocs-travel-time-sheet-project/memory/MEMORY.md` has cross-session context (decisions, gotchas, Cloudflare bypass, QA driver).
+6. For UI patterns, study `web/screens/addresses.js` — it's the reference for how a screen interacts with the shell, the API client, the form helpers, the toast.
+7. For browser-driven QA: `bun run qa login` once, then `bun run qa <cmd>` (see `scripts/qa.ts` header).
+8. M6 reference (if M6 context is needed): `docs/M6_BRIEF.md`.
+9. M5 reference (only if historical data context is needed): `docs/M5_INVENTORY.md`, `docs/M5_QUIZ.md`, `docs/M5_QUIZ_2.md`.

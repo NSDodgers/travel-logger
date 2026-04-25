@@ -1,5 +1,7 @@
 # M6 brief — address book + Mapbox
 
+> **STATUS: ✅ Done 2026-04-25.** Kept for reference. For the next milestone, read `docs/M7_BRIEF.md`. M6 outcome summarized in `STATUS.md`.
+
 _Starting point for a fresh chat session. Read this, then `STATUS.md`, then `implementation_plan.md` §8 (M6 line) + §10 (UI spec)._
 
 ## What M6 is
