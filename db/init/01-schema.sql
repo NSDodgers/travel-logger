@@ -70,6 +70,7 @@ create table public.trips (
   party               text not null check (party in ('solo','family')),
   transit             text not null check (transit in ('car','public')),
   tsa_precheck        boolean not null default false,
+  international       boolean not null default false,  -- toggles dep_customs tile visibility (M7)
 
   status              text not null default 'in_progress' check (status in ('in_progress','complete','abandoned')),
   source              text not null default 'app' check (source in ('app','legacy')),
@@ -115,6 +116,20 @@ create table public.milestones_history (
   reason        text
 );
 
+-- Two triggers, by design:
+--   1) BEFORE UPDATE bumps updated_at (INSERTs use the column default).
+--   2) AFTER INSERT OR UPDATE writes to milestones_history. Must run after
+--      the parent row exists because milestones_history.milestone_id has a
+--      `deferrable initially immediate` FK that resolves at end-of-statement.
+--   The audit function is SECURITY DEFINER so postgrest_user (which has no
+--   grants on public.*) can still insert via the trigger.
+create or replace function public.milestones_touch_updated_at() returns trigger as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$ language plpgsql;
+
 create or replace function public.milestones_audit() returns trigger as $$
 begin
   if (tg_op = 'INSERT') then
@@ -130,13 +145,17 @@ begin
         values (new.id, case when new.void then 'void' else 'unvoid' end, new.void_reason);
     end if;
   end if;
-  new.updated_at := now();
-  return new;
+  return null;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
+alter function public.milestones_audit() set search_path = public, pg_temp;
+
+create trigger milestones_touch_trg
+  before update on public.milestones
+  for each row execute function public.milestones_touch_updated_at();
 
 create trigger milestones_audit_trg
-  before insert or update on public.milestones
+  after insert or update on public.milestones
   for each row execute function public.milestones_audit();
 
 -- ─── Predictions (accuracy feedback loop) ─────────────────────────────────
@@ -177,8 +196,8 @@ create view api.trips as
   select
     id, direction, address_id, dep_airport, arr_airport, actual_arr_airport,
     sched_dep_local, sched_arr_local, sched_dep_date, sched_arr_date,
-    dst_warning, bags, party, transit, tsa_precheck, status, source,
-    created_at, updated_at
+    dst_warning, bags, party, transit, tsa_precheck, international,
+    status, source, created_at, updated_at
   from public.trips;
 
 create view api.milestones as
