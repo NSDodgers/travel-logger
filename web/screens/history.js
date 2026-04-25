@@ -75,12 +75,13 @@ function rowHtml(trip) {
     : trip.status === 'abandoned'
     ? '<span class="history-badge abandoned">incomplete</span>'
     : '';
+  const testBadge = trip.test ? '<span class="history-badge test">test</span>' : '';
   return `
     <li class="history-row" data-id="${escapeAttr(trip.id)}" role="button" tabindex="0">
       <div class="history-row-main">
         <div class="history-row-route">${escapeHtml(route)}</div>
         <div class="history-row-meta">
-          ${escapeHtml(date)} ${statusBadge}
+          ${escapeHtml(date)} ${statusBadge} ${testBadge}
         </div>
       </div>
       <div class="history-row-side">
@@ -136,7 +137,7 @@ function renderTimeline(root, trip, milestones) {
           ${trip.international ? ' · International' : ''}
         </div>
         <div class="trip-header-meta">
-          Source: ${escapeHtml(trip.source)} · Status: ${escapeHtml(prettyStatus(trip.status))}
+          Source: ${escapeHtml(trip.source)} · Status: ${escapeHtml(prettyStatus(trip.status))}${trip.test ? ' · <strong style="color:var(--warning)">TEST</strong>' : ''}
         </div>
       </div>
       ${milestones.length === 0

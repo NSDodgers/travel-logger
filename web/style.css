@@ -784,6 +784,7 @@ a { color: var(--accent); text-decoration: none; }
 }
 .history-badge.in-progress { color: var(--accent); border: 1px solid var(--accent); }
 .history-badge.abandoned { color: var(--muted); border: 1px solid var(--border); }
+.history-badge.test { color: var(--warning); border: 1px solid var(--warning); }
 
 /* Trip timeline (single trip detail). */
 .trip-header {

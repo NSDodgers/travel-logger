@@ -482,6 +482,7 @@ async function openDepStartSheet() {
     transit: initialTransit,
     tsa_precheck: initialTsa,
     international: false,
+    test: false,              // M11: never sticky — always re-confirm per trip
   };
 
   openSheet({
@@ -559,6 +560,14 @@ async function openDepStartSheet() {
           </div>
           <p class="hint">Yes shows the Customs tile (e.g. YYZ US preclearance).</p>
         </div>
+        <div class="form-row">
+          <label>Test trip</label>
+          <div class="toggle-group" data-field="test">
+            <button type="button" data-value="false">No</button>
+            <button type="button" data-value="true">Yes</button>
+          </div>
+          <p class="hint">Test trips show a TEST badge in history and never feed predictions.</p>
+        </div>
 
         <div id="trip-error" class="hint" style="color:var(--error)" hidden></div>
         <div class="form-actions">
@@ -580,7 +589,7 @@ async function openDepStartSheet() {
           b.addEventListener('click', () => {
             g.querySelectorAll('button').forEach((bb) => bb.setAttribute('aria-pressed', 'false'));
             b.setAttribute('aria-pressed', 'true');
-            draft[field] = field === 'tsa_precheck' || field === 'international'
+            draft[field] = (field === 'tsa_precheck' || field === 'international' || field === 'test')
               ? b.dataset.value === 'true'
               : b.dataset.value;
           });
@@ -707,6 +716,7 @@ async function startTrip(d) {
     transit: d.transit,
     tsa_precheck: d.tsa_precheck,
     international: d.international,
+    test: d.test,
     status: 'in_progress',
     source: 'app',
   };
@@ -783,6 +793,7 @@ async function openArrivalStartSheet() {
     transit:        lastDep?.transit || 'car',
     tsa_precheck:   !!lastDep?.tsa_precheck,
     international:  !!lastDep?.international,
+    test:           false,        // M11: never sticky — always re-confirm per trip
   };
 
   openSheet({
@@ -847,6 +858,14 @@ async function openArrivalStartSheet() {
           </div>
           <p class="hint">Yes shows the Customs tile in the active grid.</p>
         </div>
+        <div class="form-row">
+          <label>Test trip</label>
+          <div class="toggle-group" data-field="test">
+            <button type="button" data-value="false">No</button>
+            <button type="button" data-value="true">Yes</button>
+          </div>
+          <p class="hint">Test trips show a TEST badge in history and never feed predictions.</p>
+        </div>
 
         <div id="arr-error" class="hint" style="color:var(--error)" hidden></div>
         <div class="form-actions">
@@ -870,7 +889,7 @@ async function openArrivalStartSheet() {
           b.addEventListener('click', () => {
             g.querySelectorAll('button').forEach((bb) => bb.setAttribute('aria-pressed', 'false'));
             b.setAttribute('aria-pressed', 'true');
-            draft[field] = field === 'tsa_precheck' || field === 'international'
+            draft[field] = (field === 'tsa_precheck' || field === 'international' || field === 'test')
               ? b.dataset.value === 'true'
               : b.dataset.value;
           });
@@ -966,6 +985,7 @@ async function startArrivalTrip(d) {
     transit: d.transit,
     tsa_precheck: d.tsa_precheck,
     international: d.international,
+    test: d.test,
     status: 'in_progress',
     source: 'app',
   };
