@@ -867,6 +867,11 @@ function emitSql(addresses: Address[], trips: TripRow[]): string {
   lines.push("");
   lines.push("begin;");
   lines.push("");
+  lines.push("-- Defer milestones_history FK: the BEFORE INSERT trigger on milestones");
+  lines.push("-- inserts a history row referencing milestone.id before the parent row");
+  lines.push("-- is visible. Migration 05-m5-prep made this FK deferrable.");
+  lines.push("set constraints milestones_history_milestone_id_fkey deferred;");
+  lines.push("");
   lines.push("-- Idempotency: wipe existing legacy data before reload");
   lines.push("delete from public.milestones where trip_id in (select id from public.trips where source = 'legacy');");
   lines.push("delete from public.trips where source = 'legacy';");

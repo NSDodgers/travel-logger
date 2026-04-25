@@ -39,3 +39,27 @@ insert into public.milestone_kinds (kind, direction, order_seq, label, shown_whe
   ('dep_customs', 'departure', 5, 'Through Customs', true),
   ('arr_customs', 'arrival',   2, 'Through Customs', true)
 on conflict (kind) do nothing;
+
+-- ─── Defer the milestones_history FK ───────────────────────────────────────
+-- The BEFORE INSERT trigger on public.milestones writes into
+-- milestones_history with new.id BEFORE the parent milestone row is
+-- visible to FK checks. With NOT DEFERRABLE this fails on the first real
+-- write. Switching to DEFERRABLE INITIALLY IMMEDIATE preserves normal
+-- behavior but allows bulk loaders to SET CONSTRAINTS DEFERRED.
+
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'milestones_history_milestone_id_fkey'
+      and not condeferrable
+  ) then
+    alter table public.milestones_history
+      drop constraint milestones_history_milestone_id_fkey;
+    alter table public.milestones_history
+      add constraint milestones_history_milestone_id_fkey
+      foreign key (milestone_id) references public.milestones(id)
+      on delete cascade
+      deferrable initially immediate;
+  end if;
+end $$;

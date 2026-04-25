@@ -13,8 +13,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-if ! docker compose ps --format json travel-postgres 2>/dev/null | grep -q '"State":"running"'; then
-  echo "travel-postgres container is not running."
+if ! docker compose ps --format json postgres 2>/dev/null | grep -q '"State":"running"'; then
+  echo "postgres service is not running."
   echo "Start the stack first: docker compose up -d"
   exit 1
 fi
