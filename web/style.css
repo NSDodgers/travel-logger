@@ -61,8 +61,8 @@ a { color: var(--accent); text-decoration: none; }
 .app {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   max-width: 480px;
   margin: 0 auto;
   padding:
