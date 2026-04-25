@@ -1,12 +1,15 @@
-// Log screen — M7. Empty-state hero, trip-start sheet, active 2x2-tile grid,
+// Log screen. Empty-state hero, trip-start sheet, active 2x2-tile grid,
 // long-press edit/void, undo toast.
 //
-// Direct fetches (no IndexedDB queue yet — that's M8). Optimistic milestone
-// taps with a revert on failure. Per-direction milestone progression driven
-// by api.milestone_kinds (so customs/bag visibility lives in data, not code).
+// Writes go through the IndexedDB outbox (M8): the screen pushes to in-memory
+// state, renders, and enqueues — no `await` on the server response. The body
+// carries a client-generated `id` so downstream FKs work before the queue
+// drains. Per-direction milestone progression driven by api.milestone_kinds
+// (so customs/bag visibility lives in data, not code).
 
 import { api, ApiError } from '../api.js';
 import { mountAirportPicker } from './airport-picker.js';
+import { getQueuedFor, getQueuedActiveTrip } from '../queue.js';
 
 // ── Module-level state ─────────────────────────────────────────────────────
 
@@ -19,6 +22,11 @@ let state = {
 };
 
 let lastTrip = null;         // cached "most recent app trip" for sticky vars
+
+// Trips this session has queued a complete_trip PATCH for, by trip id. Used
+// so undoing the final milestone after the user tapped Finish queues a
+// reopen (status='in_progress') instead of leaving the trip frozen complete.
+const completedThisSession = new Set();
 
 // ── Entry ──────────────────────────────────────────────────────────────────
 
@@ -48,13 +56,46 @@ export async function logScreen(root) {
 }
 
 async function loadActiveTrip() {
+  // First check the outbox: a still-queued create_trip is the active trip
+  // even though the server doesn't know about it yet. Survives page reload
+  // mid-airport-WiFi.
+  const queued = await getQueuedActiveTrip();
+  if (queued) return { ...queued.body, _queued: true };
+
   const rows = await api.get(`/trips?status=eq.in_progress&order=created_at.desc&limit=1`);
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
 async function loadMilestones(tripId) {
-  const rows = await api.get(`/milestones?trip_id=eq.${tripId}&void=eq.false&order=client_seq.asc`);
-  return Array.isArray(rows) ? rows : [];
+  // Server truth (excludes void). Merge in any still-queued POST /milestones
+  // and apply pending PATCH /milestones (edit-time, void) on top — otherwise
+  // a reload during a tap drops the optimistic row until the queue drains.
+  let serverRows = [];
+  try {
+    const rows = await api.get(`/milestones?trip_id=eq.${tripId}&void=eq.false&order=client_seq.asc`);
+    serverRows = Array.isArray(rows) ? rows : [];
+  } catch (err) {
+    // If the trip is queue-only (server doesn't have it), GET /milestones?trip_id=eq.<uuid>
+    // succeeds with []. So this catch is for true network errors — log and
+    // continue with [] so queued entries can still render.
+    console.warn('loadMilestones: server fetch failed', err);
+  }
+
+  const byId = new Map(serverRows.map((m) => [m.id, m]));
+  const queued = await getQueuedFor(tripId);
+  for (const q of queued) {
+    if (q.intent === 'log_milestone') {
+      const id = q.body?.id;
+      if (id && !byId.has(id)) byId.set(id, { ...q.body, _queued: true });
+    } else if (q.intent === 'void_milestone' && q.related_milestone_id) {
+      byId.delete(q.related_milestone_id);
+    } else if (q.intent === 'edit_milestone' && q.related_milestone_id) {
+      const target = byId.get(q.related_milestone_id);
+      if (target) Object.assign(target, q.body);
+    }
+  }
+
+  return [...byId.values()].sort((a, b) => a.client_seq - b.client_seq);
 }
 
 function inferInternational(trip) {
@@ -143,18 +184,14 @@ function renderActive(root) {
   root.querySelector('#hero-tile').addEventListener('click', () => logMilestone(root, heroKind.kind));
   attachLongPressHandlers(root);
 
-  root.querySelector('#abandon-trip-btn').addEventListener('click', async () => {
+  root.querySelector('#abandon-trip-btn').addEventListener('click', () => {
     if (!confirm('Abandon this in-progress trip? Logged milestones stay in history.')) return;
-    try {
-      await api.patch(`/trips?id=eq.${state.trip.id}`,
-        { status: 'abandoned', updated_at: new Date().toISOString() });
-      state.trip = null; state.milestones = [];
-      window.__toast?.('Trip abandoned', { level: 'info' });
-      renderScreen(root);
-    } catch (err) {
-      console.error(err);
-      window.__toast?.(`Abandon failed: ${err.message}`, { level: 'error' });
-    }
+    const tripId = state.trip.id;
+    api.patch(`/trips?id=eq.${tripId}`, { status: 'abandoned' },
+      { intent: 'abandon_trip', trip_id: tripId });
+    state.trip = null; state.milestones = [];
+    window.__toast?.('Trip abandoned', { level: 'info' });
+    renderScreen(root);
   });
 }
 
@@ -233,9 +270,10 @@ function renderAllDone(root, visibleKinds, loggedByKind) {
 
 async function logMilestone(root, kind) {
   const nextSeq = (state.milestones.reduce((m, x) => Math.max(m, x.client_seq), 0)) + 1;
+  const tripId = state.trip.id;
   const optimistic = {
     id: cryptoRandomId(),
-    trip_id: state.trip.id,
+    trip_id: tripId,
     kind,
     logged_at: new Date().toISOString(),
     client_seq: nextSeq,
@@ -244,109 +282,83 @@ async function logMilestone(root, kind) {
   state.milestones.push(optimistic);
   renderActive(root);
 
-  try {
-    const [saved] = await api.post('/milestones', {
-      id: optimistic.id,
-      trip_id: optimistic.trip_id,
-      kind: optimistic.kind,
-      logged_at: optimistic.logged_at,
-      client_seq: optimistic.client_seq,
-    });
-    if (saved) {
-      const idx = state.milestones.findIndex((m) => m.id === optimistic.id);
-      if (idx >= 0) state.milestones[idx] = saved;
-    }
-    haptic(10);
-    showUndoToast(root, optimistic.id, kindLabel(kind));
-  } catch (err) {
-    console.error(err);
-    state.milestones = state.milestones.filter((m) => m.id !== optimistic.id);
-    renderActive(root);
-    window.__toast?.(`Log failed: ${err.message}`, { level: 'error' });
-  }
+  api.post('/milestones', {
+    id: optimistic.id,
+    trip_id: optimistic.trip_id,
+    kind: optimistic.kind,
+    logged_at: optimistic.logged_at,
+    client_seq: optimistic.client_seq,
+  }, { intent: 'log_milestone', trip_id: tripId, milestone_id: optimistic.id });
+
+  haptic(10);
+  showUndoToast(root, optimistic.id, tripId, kindLabel(kind));
 }
 
-function showUndoToast(root, milestoneId, label) {
+function showUndoToast(root, milestoneId, tripId, label) {
   window.__toast?.(`Logged: ${label}`, {
     level: 'success',
     ms: 60_000,
     action: {
       label: 'Undo',
-      onClick: () => voidMilestone(root, milestoneId, 'undo'),
+      onClick: () => voidMilestone(root, milestoneId, tripId, 'undo'),
     },
   });
 }
 
-async function voidMilestone(root, milestoneId, reason) {
-  // Look the row up in state, but tolerate it being missing — undo of the
-  // FINAL milestone after auto-complete arrives here with state already wiped.
+async function voidMilestone(root, milestoneId, tripId, reason) {
+  // ms may be missing if undo fired after the user tapped Finish (state.trip
+  // and state.milestones are wiped at that point). The toast captures tripId
+  // in its closure so we can still queue the void + reopen.
   const ms = state.milestones.find((m) => m.id === milestoneId);
   const label = ms ? kindLabel(ms.kind) : 'milestone';
   if (ms) {
     state.milestones = state.milestones.filter((m) => m.id !== milestoneId);
     renderActive(root);
   }
-  try {
-    const [updated] = await api.patch(`/milestones?id=eq.${milestoneId}`,
-      { void: true, void_reason: reason });
-    if (!updated) throw new Error('Void returned no row');
-    window.__toast?.(`Removed: ${label}`, { level: 'info' });
-    // If the trip was auto-completed by this milestone, reopen it.
-    const tripId = updated.trip_id;
-    const [trip] = await api.get(`/trips?id=eq.${tripId}`);
-    if (trip?.status === 'complete') {
-      await api.patch(`/trips?id=eq.${tripId}`,
-        { status: 'in_progress', updated_at: new Date().toISOString() });
-    }
-    // Resync from server and re-render whatever the current screen is.
+
+  api.patch(`/milestones?id=eq.${milestoneId}`,
+    { void: true, void_reason: reason },
+    { intent: 'void_milestone', trip_id: tripId, milestone_id: milestoneId });
+  window.__toast?.(`Removed: ${label}`, { level: 'info' });
+
+  // If the user already tapped Finish on this trip, re-open it. Tracked
+  // client-side via completedThisSession (the queue may not have drained).
+  if (tripId && completedThisSession.has(tripId)) {
+    api.patch(`/trips?id=eq.${tripId}`,
+      { status: 'in_progress' },
+      { intent: 'reopen_trip', trip_id: tripId });
+    completedThisSession.delete(tripId);
+    // Re-mount the active state so the user can keep editing.
     state.trip = await loadActiveTrip();
     state.milestones = state.trip ? await loadMilestones(state.trip.id) : [];
     const screenEl = document.getElementById('screen');
     if (screenEl) renderScreen(screenEl);
-  } catch (err) {
-    console.error(err);
-    if (ms) {
-      state.milestones.push(ms);
-      state.milestones.sort((a, b) => a.client_seq - b.client_seq);
-      renderActive(root);
-    }
-    window.__toast?.(`Undo failed: ${err.message}`, { level: 'error' });
   }
 }
 
-async function editMilestoneTime(root, milestoneId, newIsoUtc) {
+function editMilestoneTime(root, milestoneId, newIsoUtc) {
   const ms = state.milestones.find((m) => m.id === milestoneId);
   if (!ms) return;
-  const prevAt = ms.logged_at;
   ms.logged_at = newIsoUtc;
   renderActive(root);
-  try {
-    await api.patch(`/milestones?id=eq.${milestoneId}`,
-      { logged_at: newIsoUtc });
-    window.__toast?.('Time updated', { level: 'success' });
-  } catch (err) {
-    console.error(err);
-    ms.logged_at = prevAt;
-    renderActive(root);
-    window.__toast?.(`Edit failed: ${err.message}`, { level: 'error' });
-  }
+  api.patch(`/milestones?id=eq.${milestoneId}`,
+    { logged_at: newIsoUtc },
+    { intent: 'edit_milestone', trip_id: state.trip?.id, milestone_id: milestoneId });
+  window.__toast?.('Time updated', { level: 'success' });
 }
 
-async function completeTrip(root) {
+function completeTrip(root) {
   if (!state.trip || state.trip._completing) return;
   state.trip._completing = true;
-  try {
-    await api.patch(`/trips?id=eq.${state.trip.id}`, { status: 'complete' });
-    window.__toast?.('Trip complete 🎉', { level: 'success', ms: 4000 });
-  } catch (err) {
-    console.error(err);
-    window.__toast?.(`Complete failed: ${err.message}`, { level: 'error' });
-  } finally {
-    state.trip = null;
-    state.milestones = [];
-    state.international = false;
-    renderScreen(root);
-  }
+  const tripId = state.trip.id;
+  api.patch(`/trips?id=eq.${tripId}`, { status: 'complete' },
+    { intent: 'complete_trip', trip_id: tripId });
+  completedThisSession.add(tripId);
+  window.__toast?.('Trip complete 🎉', { level: 'success', ms: 4000 });
+  state.trip = null;
+  state.milestones = [];
+  state.international = false;
+  renderScreen(root);
 }
 
 // ── Long-press → edit/void sheet ───────────────────────────────────────────
@@ -411,7 +423,7 @@ function openEditVoidSheet(root, milestoneId, kind) {
       });
       sheetRoot.querySelector('#void-btn').addEventListener('click', () => {
         close();
-        voidMilestone(root, milestoneId, 'manual');
+        voidMilestone(root, milestoneId, state.trip.id, 'manual');
       });
     },
   });
@@ -649,12 +661,15 @@ function validateDraft(d) {
 
 async function startTrip(d) {
   // Compute DST flag (one warning recorded per trip; departure takes precedence).
-  let dst_warning = null;
   const depDst = checkDstCode(d.sched_dep_date, d.sched_dep_time, d.dep_airport.tz);
   const arrDst = checkDstCode(d.sched_arr_date, d.sched_arr_time, d.arr_airport.tz);
-  dst_warning = depDst || arrDst;
+  const dst_warning = depDst || arrDst;
 
-  const [trip] = await api.post('/trips', {
+  // Client-generate the trip id so the first milestone's trip_id resolves
+  // before either POST drains.
+  const tripId = cryptoRandomId();
+  const tripBody = {
+    id: tripId,
     direction: 'departure',
     address_id: d.address_id,
     dep_airport: d.dep_airport.iata,
@@ -671,24 +686,28 @@ async function startTrip(d) {
     international: d.international,
     status: 'in_progress',
     source: 'app',
-  });
-  if (!trip) throw new Error('Trip create returned no row');
+  };
+  api.post('/trips', tripBody, { intent: 'create_trip', trip_id: tripId });
 
-  const [milestone] = await api.post('/milestones', {
-    id: cryptoRandomId(),
-    trip_id: trip.id,
+  const milestoneId = cryptoRandomId();
+  const milestoneBody = {
+    id: milestoneId,
+    trip_id: tripId,
     kind: 'dep_in_transit',
     logged_at: new Date().toISOString(),
     client_seq: 1,
-  });
+    void: false,
+  };
+  api.post('/milestones', milestoneBody,
+    { intent: 'log_milestone', trip_id: tripId, milestone_id: milestoneId });
 
-  // Rebuild active state from the server's truth.
-  state.trip = trip;
-  state.milestones = milestone ? [milestone] : [];
+  // Mount active state from our optimistic bodies — they're the source of
+  // truth until the queue drains.
+  state.trip = tripBody;
+  state.milestones = [milestoneBody];
   state.international = d.international;
   haptic(15);
   window.__toast?.('Trip started · In Transit logged', { level: 'success' });
-  // Re-render the screen.
   const screenEl = document.getElementById('screen');
   if (screenEl) renderScreen(screenEl);
 }
