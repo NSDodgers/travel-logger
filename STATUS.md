@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-04-25 after M9. Update this file at the end of each milestone._
+_Last updated: 2026-04-25 after M10. Update this file at the end of each milestone._
 
 ## Milestones
 
@@ -15,8 +15,9 @@ _Last updated: 2026-04-25 after M9. Update this file at the end of each mileston
 | M7 | ✅ | Departure log flow live: empty hero → trip-start sheet (origin, dep+arr airport pickers, sched dep/arr datetime, bags/party/transit/TSA/international toggles, DST validation) → 2×2 hero+strip grid with one-tap milestone progression → "All milestones logged" gate → tap-to-finish. Long-press (touch ≥500ms or contextmenu) opens edit-time/void sheet. 60s undo toast on every tap; undoing the final tap reopens an auto-completed trip. Two migrations: 003 splits the audit trigger (BEFORE-touch + AFTER-audit, SECURITY DEFINER) so PostgREST can write through it; 004 persists the `international` flag on trips. Layout: hero + 4-tile strip (Nick chose this over fixed 2×4 since dep/arr both have 5 kinds). Customs visibility: manual flag in trip-start sheet. |
 | M8 | ✅ | Offline queue. `web/queue.js` is an IndexedDB outbox with head-only drain + foreground retry (online / visibilitychange / 15s interval). `web/api.js` is now a `fetchJSON()` primitive (`redirect: 'manual'`, JSON-shape check, status taxonomy: success / duplicate (23505) / fk_missing (23503) / auth_required (3xx + non-JSON 2xx) / dead_letter / retriable / network_error). `api.post`/`api.patch` enqueue and return `[body]` so optimistic UI keeps working; `api.get` is direct. Sync strip above `<main>` color-coded by state (amber pending, blue syncing, amber retrying, red dead-letter). Dead-letter sheet has Retry/Discard per entry. Auth-expired modal pauses the queue and bounces to `/auth/`. `navigator.storage.persist()` requested at boot. Caps: 5000 entries / 10MB. `getQueuedActiveTrip()` + `getQueuedFor(trip_id)` merge queue state on log-screen mount so reload mid-trip doesn't drop optimistic taps. One small migration (`005`) — the addresses BEFORE-UPDATE `updated_at` trigger that pre-M7 STATUS had flagged. `scripts/qa.ts` adds `offline on/off` (Playwright `setOffline`). E2E airplane-mode test passes: 3 enqueues offline → strip "Offline · 3 taps pending" → online → drain → DB reflects all three. UI-driven test (offline edit Home label → save → online → drain) confirmed end-to-end through the real screens. |
 | M9 | ✅ | Arrival flow + 3-tab history. Empty state stacks two heroes — Dep: In Transit (accent) on top, Arr: Off Plane (surface) below. Tapping arr opens a minimal start sheet that auto-fills the arrival airport from the most-recent completed *departure* trip's `arr_airport` (with a Change affordance), carries the dep-side airport forward silently, and pulls sticky bags / party / transit / TSA / international from the same trip. Active state is now direction-agnostic — `visibleKindsForTrip()` filters milestone_kinds by `trip.direction`, applies the carry-on hide rule, and hides `arr_customs` unless international. `currentAirportIata()` picks `dep_airport` for departures vs `arr_airport` for arrivals when formatting milestone times. `web/screens/history.js` exposes `/history` (list, sorted by trip date desc, source badge for app/legacy, status badge for in_progress/abandoned, 200-row cap) and `/history/:id` (per-trip timeline with logged_at + duration delta from previous milestone). `getQueuedActiveTrip()` iterates DESC so a queued arrival wins over an older queued departure. `scripts/qa.ts screenshot --viewport` for non-fullPage shots. UI-verified end-to-end: empty → arr sheet → start → JFK→LAX active grid (4 visible kinds, hero=arr_bags, off-plane done) → abandon → empty. |
-| **M10** | **⏳ next** | Predict tab — Bun service with percentile + widening + prediction-row writeback. See `docs/M10_BRIEF.md`. |
-| M11–M13 | planned | See `implementation_plan.md` §8 |
+| M10 | ✅ | Predict tab live. Form mirrors trip-start sheet (direction toggle / airport picker / bags / party / transit / TSA / international / DST-validated date+time). `services/predict/src/index.ts` replaces the M2 stub: per-trip duration = `extract(epoch from (max(logged_at) - min(logged_at)))` over non-void milestones, `having count(*) >= 2`, status excludes `in_progress`. Filter widening drops `tsa_precheck → party → transit → bags` and stops; airport + international never relax (locked decision 2026-04-25 — cross-airport averages mislead). Result card always surfaces sample composition: N matching · X incomplete (formerly "abandoned" — UI rename only, DB enum unchanged) · applied filters · relaxed filters. Three card shapes: `full` (N≥5, p90 hero + p50 comfortable + sparkline), `low_n` (1≤N<5, median hero, no sparkline), `empty` (N=0 after widening, "log a trip to start predicting"). Math: departure subtracts offset_s from flight time; arrival adds. Every prediction persists to `public.predictions` for M13 calibration. `predict_user` granted SELECT on predictions (migration 006) — needed for `INSERT...RETURNING` and M13 reads. Caddy strips `/api` before proxying to bun-predict so the service handles both `/predict/*` and `/api/predict/*` shapes. DST helpers extracted to `web/dst.js` (shared between log.js and predict.js). `api.predict()` is direct request/response (NOT queued — predictions are synchronous, the user is staring at the screen). UI-verified end-to-end: LGA dep carry-on → 16 trips, p90 46 min, leave-by 1:09 PM. JFK arr checked → 16 trips, p90 6h22m, arrive-by 8:16 PM. TSA=Yes drops → relaxed:[tsa_precheck]. BHX dep → empty after relaxing all 4. |
+| **M11** | **⏳ next** | First real trip. Use the app on an actual airport run before backups/monitoring land. See `implementation_plan.md` §8. |
+| M12–M13 | planned | See `implementation_plan.md` §8 |
 
 ## Currently running on Mac Studio
 
@@ -30,7 +31,7 @@ Expected — 6 containers all `Up` and healthy:
 - `travel-authelia` — auth portal at `/auth/`
 - `travel-postgres` — source of truth (db `travel`)
 - `travel-postgrest` — REST API at `/api/*` (via `api.*` views)
-- `travel-predict` — Bun skeleton at `/api/predict/*` (real logic lands in M10)
+- `travel-predict` — Bun service at `/api/predict/*` (M10: percentile + filter widening live)
 - `travel-pgbackup` — nightly `pg_dump` cron at 03:00 local
 
 Public URL: **<https://travel.myhometech.app>**
@@ -108,13 +109,18 @@ Every file in `./secrets/` is `chmod 0600`, gitignored. Regenerated via `./scrip
 | `4847e97` | M9 arrival flow — double-hero empty + start sheet + active grid |
 | `5de8719` | M9 trip history list + per-trip timeline (web/screens/history.js) |
 | `d8cfb93` | M9 CSS + qa.ts screenshot --viewport flag |
+| (next) | M10 db migration 006 — predict_user select grant on predictions |
+| (next) | M10 predict service — percentile + widening + prediction-row writeback |
+| (next) | M10 predict screen + api.predict + history "incomplete" copy |
 
 Diff against `main` (what changed since last push): `git log --oneline origin/main..HEAD` — should be empty if everything's pushed.
 
 ## Known small things
 
-- `bun-predict` skeleton only has `/api/predict/health`. `POST /api/predict` returns 501. Real percentile + widening math lands in M10.
 - `walg` container is stubbed in `compose.yml` (commented out). Gets activated in M12.
+- M10 sparkline is dominated by long-tail outliers in the legacy data (e.g. one LGA trip with an 11h+ first-to-last gap from a stale Dep_InTransit log). The math is honest but the visual is muted. Revisit copy/binning after M11 generates real-trip data.
+- "Abandoned" trips are now labeled "Incomplete" in the UI (history badge, predict breakdown). DB enum value stays `abandoned` — purely a copy change. The Log screen's Abandon button kept its verb (it's the action; "Incomplete" is the resulting state).
+- `predict_user` now has SELECT on `public.predictions` so `INSERT…RETURNING id` works (migration 006). M13 will use the same grant for calibration scoring.
 - `web/index.html` is the real PWA shell (M6). M7 added the trip-logging grid; M8 added the sync strip + auth-expired modal.
 - `web/icon.svg` is a placeholder (amber "T" on black). Nick can design real icons + an Apple-touch PNG before M11 "first real trip."
 - Mapbox token must have `https://travel.myhometech.app/*` and `http://127.0.0.1:8090/*` in its URL restriction before M6 is reachable end-to-end.
@@ -157,16 +163,17 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 ## If Claude is starting a fresh session
 
 1. Read this file first.
-2. Read `docs/M10_BRIEF.md` — full spec for the Predict tab (the next milestone), open decisions, deliverables, suggested opening question.
-3. Read `implementation_plan.md` §1 (predictor honesty), §5 (predictions schema), §7 Flow D + §10 result card spec for surrounding context.
-4. Read `CLAUDE.md` — project brief + skill routing.
-5. Memory at `~/.claude/projects/-Users-nicksolyom-Library-Mobile-Documents-com-apple-CloudDocs-travel-time-sheet-project/memory/MEMORY.md` has cross-session context (decisions, gotchas, Cloudflare bypass, QA driver).
-6. For UI patterns, study `web/screens/log.js` (M7+M9 — primary screen, sheet primitive, optimistic UI, both directions) and `web/screens/addresses.js` (M6 — list/form/toast).
-7. For the queue, study `web/queue.js` (M8 — IndexedDB outbox, head-only drain, status taxonomy) and `web/api.js` (`fetchJSON()` primitive). Every write goes through `api.post`/`api.patch` which enqueue rather than awaiting the network.
-8. For history, study `web/screens/history.js` (M9 — list + timeline, server-only reads, no writes).
+2. M11 is next — "first real trip." See `implementation_plan.md` §8 for context. Mostly a UX validation pass: dogfood the app on an actual airport run before backups/monitoring land. Likely no big code lift unless the trip surfaces a real bug.
+3. Read `CLAUDE.md` — project brief + skill routing.
+4. Memory at `~/.claude/projects/-Users-nicksolyom-Library-Mobile-Documents-com-apple-CloudDocs-travel-time-sheet-project/memory/MEMORY.md` has cross-session context (decisions, gotchas, Cloudflare bypass, QA driver, M10 predict decisions).
+5. For UI patterns, study `web/screens/log.js` (M7+M9 — primary screen, sheet primitive, optimistic UI, both directions) and `web/screens/addresses.js` (M6 — list/form/toast).
+6. For the queue, study `web/queue.js` (M8 — IndexedDB outbox, head-only drain, status taxonomy) and `web/api.js` (`fetchJSON()` primitive). Every write goes through `api.post`/`api.patch` which enqueue rather than awaiting the network. Predictions are the one exception — `api.predict()` is direct request/response.
+7. For history, study `web/screens/history.js` (M9 — list + timeline, server-only reads, no writes).
+8. For prediction, study `services/predict/src/index.ts` (M10 — percentile + filter widening + persist) and `web/screens/predict.js` (M10 — form + result card + sparkline). DST helpers live in `web/dst.js` (shared by log + predict).
 9. For browser-driven QA: `bun run qa login` once, then `bun run qa <cmd>` (see `scripts/qa.ts` header). Tip: Caddy serves `Cache-Control: no-store` but the Playwright persistent profile still caches; force-bust with `location.href = '/?_=' + Date.now() + '#/whatever'` before each verification round. Airplane-mode tests: `bun run qa offline on|off`. Viewport (non-fullPage) screenshots: `bun run qa screenshot --viewport`.
-10. M9 reference: M9 row in this STATUS for what shipped; `web/screens/log.js` (arrival flow + double-hero) and `web/screens/history.js` (list + timeline) for the implementation.
-11. M8 reference: `docs/M8_BRIEF.md` for the spec; `web/queue.js` + `web/sync-strip.js` for the implementation.
-12. M7 reference: `docs/M7_BRIEF.md` for what was scoped; `web/screens/log.js` for the implementation.
-13. M6 reference (if M6 context is needed): `docs/M6_BRIEF.md`.
-14. M5 reference (only if historical data context is needed): `docs/M5_INVENTORY.md`, `docs/M5_QUIZ.md`, `docs/M5_QUIZ_2.md`.
+10. M10 reference: M10 row in this STATUS for what shipped; `services/predict/src/index.ts` (Bun handler) + `web/screens/predict.js` (form + result card) for the implementation.
+11. M9 reference: M9 row in this STATUS for what shipped; `web/screens/log.js` (arrival flow + double-hero) and `web/screens/history.js` (list + timeline) for the implementation.
+12. M8 reference: `docs/M8_BRIEF.md` for the spec; `web/queue.js` + `web/sync-strip.js` for the implementation.
+13. M7 reference: `docs/M7_BRIEF.md` for what was scoped; `web/screens/log.js` for the implementation.
+14. M6 reference (if M6 context is needed): `docs/M6_BRIEF.md`.
+15. M5 reference (only if historical data context is needed): `docs/M5_INVENTORY.md`, `docs/M5_QUIZ.md`, `docs/M5_QUIZ_2.md`.
