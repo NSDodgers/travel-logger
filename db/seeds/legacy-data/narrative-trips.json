@@ -1,0 +1,578 @@
+{
+  "_comment": "All 59 narrative-file entries from `imports/2017 - 2022 data` resolved during M5 session. Each entry maps to one flight which expands to two trip rows (departure + arrival) per the universal 2-row rule. Times are airport-local HH:MM. Date typos already corrected.",
+  "trips": [
+    {
+      "id": "A1", "date": "2017-08-02", "flight": "DL41", "airline": "DL", "pnr": "F97DKP",
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "LAX", "arrTerminal": null,
+      "schedDepLocal": "18:20", "schedArrLocal": "21:40",
+      "bags": "checked", "transit": "public", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "14:35", "synthesized": true}, {"kind": "dep_security", "time": "17:05", "synthesized": true}],
+      "arrMilestones": [], "source": "narrative", "notes": "anchor synthesized from sched_dep - 75min buffer + narrative 2.5h home-to-security"
+    },
+    {
+      "id": "A2", "date": "2017-08-18", "flight": "PD128", "airline": "PD", "pnr": "MECTNE",
+      "depAirport": "EWR", "depTerminal": "TB", "arrAirport": "YTZ", "arrTerminal": null,
+      "schedDepLocal": "12:45", "schedArrLocal": "14:25",
+      "bags": "carry_on", "transit": "public", "party": "group_without_kids", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "09:15", "synthesized": true}, {"kind": "dep_security", "time": "11:45", "synthesized": true}],
+      "arrMilestones": [], "source": "narrative", "notes": "with Nikki pre-Leo; sched_dep revised from 12:10 due to delay"
+    },
+    {
+      "id": "A3", "date": "2017-09-26", "flight": "DL464", "airline": "DL", "pnr": "HMNLR3",
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "SFO", "arrTerminal": null,
+      "schedDepLocal": "15:30", "schedArrLocal": "19:15",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "12:00"}, {"kind": "dep_security", "time": "12:52"}],
+      "arrMilestones": [], "source": "narrative"
+    },
+    {
+      "id": "A4", "date": "2017-10-20", "flight": "B6359", "airline": "B6", "pnr": "SSZYYG",
+      "depAirport": "JFK", "depTerminal": "T5", "arrAirport": "BUR", "arrTerminal": null,
+      "schedDepLocal": "16:59", "schedArrLocal": "20:17",
+      "bags": "checked", "transit": "public", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "12:35"}, {"kind": "dep_security", "time": "14:58"}],
+      "arrMilestones": [], "source": "narrative"
+    },
+    {
+      "id": "A5", "date": "2017-12-23", "flight": "DL458", "airline": "DL", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "LAX", "arrTerminal": null,
+      "schedDepLocal": "13:55", "schedArrLocal": "17:25",
+      "bags": "carry_on", "transit": "public", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "10:10"}, {"kind": "dep_security", "time": "11:50"}],
+      "arrMilestones": [], "source": "narrative"
+    },
+    {
+      "id": "A6", "date": "2018-06-18", "flight": "DL5177", "airline": "DL", "pnr": "H7SXXL",
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "ORD", "arrTerminal": null,
+      "schedDepLocal": "12:49", "schedArrLocal": "14:35",
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "09:25"}, {"kind": "dep_security", "time": "10:40"}],
+      "arrMilestones": [], "source": "narrative", "notes": "narrative '10:4pam' typo resolved to 10:40 via 1h15m duration"
+    },
+    {
+      "id": "A7", "date": "2018-06-25", "flight": "DY7197", "airline": "DY", "pnr": "QPUIAP",
+      "depAirport": "EWR", "depTerminal": "TB", "arrAirport": "BCN", "arrTerminal": null,
+      "schedDepLocal": "23:00", "schedArrLocal": "12:15",
+      "bags": "checked", "transit": "public", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "17:25"}, {"kind": "dep_security", "time": "19:45"}],
+      "arrMilestones": [], "source": "narrative"
+    },
+    {
+      "id": "A8", "date": "2018-07-30", "flight": "DL747", "airline": "DL", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "LAX", "arrTerminal": null,
+      "schedDepLocal": "11:55", "schedArrLocal": "14:56",
+      "bags": "checked", "transit": "public", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "08:00"}, {"kind": "dep_security", "time": "09:50"}],
+      "arrMilestones": [], "source": "narrative"
+    },
+    {
+      "id": "A9", "date": "2018-10-23", "flight": "VA6542", "airline": "VA", "pnr": "QYNYND",
+      "depAirport": "JFK", "depTerminal": "T2", "arrAirport": "LAX", "arrTerminal": "T2",
+      "schedDepLocal": "09:59", "schedArrLocal": "13:10",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "07:00"}, {"kind": "dep_security", "time": "08:12"}],
+      "arrMilestones": [], "source": "narrative", "notes": "Virgin codeshare operated by Delta; narrative T4 overridden to T2 per email"
+    },
+    {
+      "id": "A10", "date": "2019-07-30", "flight": "DL1085", "airline": "DL", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "LAX", "arrTerminal": null,
+      "schedDepLocal": "09:59", "schedArrLocal": "13:10",
+      "bags": "checked", "transit": "public", "party": "group_with_kids", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "mil_long_beach",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "06:20"}, {"kind": "dep_security", "time": "08:45"}],
+      "arrMilestones": [], "source": "narrative", "notes": "Nikki + 6mo Leo"
+    },
+    {
+      "id": "A11", "date": "2019-09-02", "flight": "DL426", "airline": "DL", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T2", "arrAirport": "SFO", "arrTerminal": null,
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "carry_on", "transit": "public", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "14:10"}, {"kind": "dep_security", "time": "16:05"}],
+      "arrMilestones": [], "source": "narrative"
+    },
+    {
+      "id": "A12", "date": "2019-11-13", "flight": "PD118", "airline": "PD", "pnr": null,
+      "depAirport": "EWR", "depTerminal": "TB", "arrAirport": "YTZ", "arrTerminal": null,
+      "schedDepLocal": "06:50", "schedArrLocal": "08:30",
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "05:10"}, {"kind": "dep_security", "time": "05:50"}],
+      "arrMilestones": [], "source": "narrative"
+    },
+    {
+      "id": "A13", "date": "2019-12-01", "flight": "DL1016", "airline": "DL", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T1", "arrAirport": "CDG", "arrTerminal": null,
+      "schedDepLocal": "16:40", "schedArrLocal": "05:50",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "12:40"}, {"kind": "dep_security", "time": "14:00"}],
+      "arrMilestones": [], "source": "narrative"
+    },
+    {
+      "id": "A14", "date": "2020-01-05", "flight": "AF11", "airline": "AF", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T1", "arrAirport": "CDG", "arrTerminal": null,
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "18:00"}, {"kind": "dep_security", "time": "19:05"}],
+      "arrMilestones": [], "source": "narrative"
+    },
+    {
+      "id": "A15", "date": "2020-03-14", "flight": "DL423", "airline": "DL", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "LAX", "arrTerminal": null,
+      "schedDepLocal": "11:45", "schedArrLocal": "15:09",
+      "bags": "checked", "transit": "car", "party": "group_with_kids", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "mil_long_beach",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "08:45"}, {"kind": "dep_security", "time": "09:35"}],
+      "arrMilestones": [], "source": "narrative"
+    },
+    {
+      "id": "A16", "date": "2020-11-10", "flight": null, "airline": "DL", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "LAX", "arrTerminal": null,
+      "schedDepLocal": "09:05", "schedArrLocal": "12:14",
+      "bags": "checked", "transit": "car", "party": "group_with_kids", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "mil_long_beach",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "06:50"}, {"kind": "dep_security", "time": "07:55"}],
+      "arrMilestones": [], "source": "narrative", "notes": "flight number unknown; freeway construction noted"
+    },
+    {
+      "id": "A17", "date": "2021-06-17", "flight": "DL703", "airline": "DL", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "LAX", "arrTerminal": null,
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "group_with_kids", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "mil_long_beach",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "06:20"}, {"kind": "dep_security", "time": "07:35"}],
+      "arrMilestones": [], "source": "narrative", "notes": "with Nick's mom + cut bag drop and TSA lines"
+    },
+    {
+      "id": "A18", "date": "2021-10-09", "flight": "VS4", "airline": "VS", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "LHR", "arrTerminal": "T3",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "15:00"}, {"kind": "dep_security", "time": "16:15"}],
+      "arrMilestones": [], "source": "narrative", "notes": "Virgin Atlantic; sky priority bag drop"
+    },
+    {
+      "id": "A19", "date": "2022-02-07", "flight": "DL451", "airline": "DL", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "TD", "arrAirport": "ORD", "arrTerminal": "T2",
+      "schedDepLocal": "07:05", "schedArrLocal": "08:45",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "chicago_state",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "05:15"}, {"kind": "dep_at_airport", "time": "05:35"}, {"kind": "dep_bags", "time": "05:40"}, {"kind": "dep_security", "time": "05:45"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "08:50"}, {"kind": "arr_in_transit", "time": "09:05"}, {"kind": "arr_at_destination", "time": "09:45"}],
+      "source": "narrative", "notes": "narrative 2/7/21 → 2022-02-07 year typo"
+    },
+    {
+      "id": "A20", "date": "2022-02-13", "flight": "DL564", "airline": "DL", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "TD", "arrAirport": "ORD", "arrTerminal": "T2",
+      "schedDepLocal": "20:15", "schedArrLocal": "22:02",
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "chicago_state",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "18:30"}, {"kind": "dep_at_airport", "time": "18:50"}, {"kind": "dep_security", "time": "18:55"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "21:35"}, {"kind": "arr_at_destination", "time": "22:25"}],
+      "source": "narrative", "notes": "year typo corrected"
+    },
+    {
+      "id": "A21", "date": "2022-02-28", "flight": "DL451", "airline": "DL", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "T0", "arrAirport": "ORD", "arrTerminal": "T2",
+      "actualArrAirport": "DTW", "status": "diverted",
+      "schedDepLocal": "07:05", "schedArrLocal": "08:45",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "chicago_state",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "05:25"}, {"kind": "dep_at_airport", "time": "05:45"}, {"kind": "dep_bags", "time": "05:50"}, {"kind": "dep_security", "time": "05:55"}],
+      "arrMilestones": [],
+      "source": "narrative", "notes": "year typo corrected; diverted to DTW per narrative 'plane computer issues'"
+    },
+    {
+      "id": "A22", "date": "2022-03-15", "flight": "DL451", "airline": "DL", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "TD", "arrAirport": "ORD", "arrTerminal": "T2",
+      "schedDepLocal": "07:25", "schedArrLocal": "08:45",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "chicago_state",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "05:30"}, {"kind": "dep_at_airport", "time": "05:50"}, {"kind": "dep_bags", "time": "06:00"}, {"kind": "dep_security", "time": "06:05"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "08:46"}, {"kind": "arr_bags", "time": "09:00"}, {"kind": "arr_at_destination", "time": "09:50"}],
+      "source": "narrative"
+    },
+    {
+      "id": "A23", "date": "2022-04-13", "flight": "DL4722", "airline": "DL", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "TC", "arrAirport": "YYZ", "arrTerminal": "T3",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "06:40"}, {"kind": "dep_at_airport", "time": "07:10"}, {"kind": "dep_bags", "time": "07:20"}, {"kind": "dep_security", "time": "07:25"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "10:45"}, {"kind": "arr_customs", "time": "12:00"}, {"kind": "arr_in_transit", "time": "12:10"}],
+      "source": "narrative", "notes": "first Toronto trip, Airbnb stay night before 210 Victoria; arr_customs uses 12:00 full-clear (work permit) timestamp"
+    },
+    {
+      "id": "A24", "date": "2022-04-17", "flight": "DL5100", "airline": "DL", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "TC", "arrAirport": "YYZ", "arrTerminal": "T3",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "toronto_victoria",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "19:08"}, {"kind": "dep_at_airport", "time": "19:31"}, {"kind": "dep_security", "time": "19:40"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "22:45"}, {"kind": "arr_customs", "time": "23:00"}, {"kind": "arr_in_transit", "time": "23:10"}, {"kind": "arr_at_destination", "time": "23:35"}],
+      "source": "narrative"
+    },
+    {
+      "id": "A25", "date": "2022-04-25", "flight": "DL4942", "airline": "DL", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "TC", "arrAirport": "YYZ", "arrTerminal": "T3",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "toronto_victoria",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "05:17"}, {"kind": "dep_at_airport", "time": "05:36"}, {"kind": "dep_security", "time": "05:50"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "08:20"}, {"kind": "arr_customs", "time": "08:30"}, {"kind": "arr_in_transit", "time": "08:40"}, {"kind": "arr_at_destination", "time": "09:43"}],
+      "source": "narrative", "notes": "narrative '5:50p TSA' typo → 5:50a"
+    },
+    {
+      "id": "A26", "date": "2022-05-09", "flight": "DL4942", "airline": "DL", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "TC", "arrAirport": "YYZ", "arrTerminal": "T3",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "toronto_victoria",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "05:31"}, {"kind": "dep_at_airport", "time": "05:52"}, {"kind": "dep_security", "time": "06:09"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "08:17"}, {"kind": "arr_customs", "time": "08:24"}, {"kind": "arr_in_transit", "time": "08:32"}, {"kind": "arr_at_destination", "time": "09:38"}],
+      "source": "narrative"
+    },
+    {
+      "id": "A27", "date": "2022-05-24", "flight": "UA8469", "airline": "UA", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "TB", "arrAirport": "YYZ", "arrTerminal": "T1",
+      "schedDepLocal": "09:05", "schedArrLocal": null,
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "toronto_victoria",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "07:01"}, {"kind": "dep_at_airport", "time": "07:26"}, {"kind": "dep_security", "time": "07:34"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "11:02"}, {"kind": "arr_customs", "time": "11:13"}, {"kind": "arr_in_transit", "time": "11:20"}, {"kind": "arr_at_destination", "time": "12:10"}],
+      "source": "narrative"
+    },
+    {
+      "id": "A28", "date": "2022-06-06", "flight": "DL5100", "airline": "DL", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "TC", "arrAirport": "YYZ", "arrTerminal": "T3",
+      "schedDepLocal": "20:59", "schedArrLocal": null,
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "toronto_victoria",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "18:58"}, {"kind": "dep_at_airport", "time": "19:20"}, {"kind": "dep_security", "time": "19:32"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "22:37"}, {"kind": "arr_customs", "time": "22:55"}, {"kind": "arr_in_transit", "time": "23:02"}, {"kind": "arr_at_destination", "time": "23:29"}],
+      "source": "narrative"
+    },
+    {
+      "id": "A29", "date": "2022-06-13", "flight": "DL5100", "airline": "DL", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "TC", "arrAirport": "YYZ", "arrTerminal": "T3",
+      "schedDepLocal": "21:05", "schedArrLocal": null,
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "toronto_victoria",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "19:32"}, {"kind": "dep_at_airport", "time": "19:53"}, {"kind": "dep_security", "time": "19:59"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "23:08"}, {"kind": "arr_customs", "time": "23:24"}, {"kind": "arr_in_transit", "time": "23:30"}, {"kind": "arr_at_destination", "time": "23:56"}],
+      "source": "narrative"
+    },
+    {
+      "id": "A30", "date": "2022-06-26", "flight": "DL351", "airline": "DL", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "LAX", "arrTerminal": "T3",
+      "schedDepLocal": "10:20", "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "group_with_kids", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "mil_long_beach",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "07:05"}, {"kind": "dep_at_airport", "time": "07:42"}, {"kind": "dep_bags", "time": "08:01"}, {"kind": "dep_security", "time": "08:30"}],
+      "arrMilestones": [],
+      "source": "narrative", "notes": "whole family; outbound for B26 5-week MIL stay"
+    },
+    {
+      "id": "A31", "date": "2022-08-07", "flight": "DL5495", "airline": "DL", "pnr": null,
+      "depAirport": "LGA", "depTerminal": "TC", "arrAirport": "YYZ", "arrTerminal": "T3",
+      "schedDepLocal": "09:00", "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": null,
+      "depMilestones": [{"kind": "dep_in_transit", "time": "06:47"}, {"kind": "dep_at_airport", "time": "07:10"}, {"kind": "dep_bags", "time": "07:22"}, {"kind": "dep_security", "time": "07:32"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "10:40"}, {"kind": "arr_customs", "time": "10:49"}, {"kind": "arr_bags", "time": "11:10"}, {"kind": "arr_in_transit", "time": "11:18"}, {"kind": "arr_at_destination", "time": "11:42"}],
+      "source": "narrative", "notes": "Toronto hotel stay, lease at 210 Victoria already ended Jun 20"
+    },
+    {
+      "id": "A32", "date": "2022-09-06", "flight": "SQ25", "airline": "SQ", "pnr": null,
+      "depAirport": "JFK", "depTerminal": "T4", "arrAirport": "FRA", "arrTerminal": "T1",
+      "schedDepLocal": "20:55", "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "home_192nd", "arrAddressId": "koln_vogelsanger",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "16:15"}, {"kind": "dep_at_airport", "time": "17:25"}, {"kind": "dep_bags", "time": "17:32"}, {"kind": "dep_security", "time": "17:41"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "11:03"}, {"kind": "arr_customs", "time": "11:19"}, {"kind": "arr_bags", "time": "11:29"}, {"kind": "arr_in_transit", "time": "11:43"}],
+      "source": "narrative", "notes": "Singapore Airlines codeshare; arrival ends at FRA train platform; onward Köln by train"
+    },
+    {
+      "id": "B1", "date": "2017-08-17", "flight": "DL2262", "airline": "DL", "pnr": "GU2RE7",
+      "depAirport": "LAX", "depTerminal": null, "arrAirport": "JFK", "arrTerminal": null,
+      "schedDepLocal": "14:00", "schedArrLocal": "22:46",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "22:46"}, {"kind": "arr_in_transit", "time": "23:00"}, {"kind": "arr_at_destination", "time": "00:25", "nextDay": true}],
+      "source": "narrative", "notes": "narrative 8/18/17 → 2017-08-17 (after-midnight home arrival)"
+    },
+    {
+      "id": "B2", "date": "2017-10-13", "flight": "DL470", "airline": "DL", "pnr": "HMNLR3",
+      "depAirport": "SFO", "depTerminal": null, "arrAirport": "JFK", "arrTerminal": "T2",
+      "schedDepLocal": "12:55", "schedArrLocal": "21:35",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "21:35"}, {"kind": "arr_at_destination", "time": "22:40"}],
+      "source": "narrative"
+    },
+    {
+      "id": "B3", "date": "2017-11-17", "flight": "WS1212", "airline": "WS", "pnr": null,
+      "depAirport": "YYZ", "depTerminal": "T3", "arrAirport": "LGA", "arrTerminal": "TD",
+      "schedDepLocal": "17:30", "schedArrLocal": "19:00",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "19:03"}, {"kind": "arr_at_destination", "time": "20:12"}],
+      "source": "narrative", "notes": "WestJet final leg of YEG→YYZ→LGA (earlier legs not narrated, skipped)"
+    },
+    {
+      "id": "B4", "date": "2018-12-16", "flight": "VA6668", "airline": "VA", "pnr": "QYNYND",
+      "depAirport": "LAX", "depTerminal": "T2", "arrAirport": "JFK", "arrTerminal": "T4",
+      "schedDepLocal": "11:45", "schedArrLocal": "20:07",
+      "bags": "carry_on", "transit": "public", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "20:50"}, {"kind": "arr_at_destination", "time": "22:30"}],
+      "source": "narrative", "notes": "Melbourne return; narrative 12/28/18 → 2018-12-16 typo"
+    },
+    {
+      "id": "B5", "date": "2018-06-22", "flight": "DL3353", "airline": "DL", "pnr": "H7SXXL",
+      "depAirport": "ORD", "depTerminal": null, "arrAirport": "JFK", "arrTerminal": "T4",
+      "schedDepLocal": "12:20", "schedArrLocal": "15:49",
+      "bags": "carry_on", "transit": "public", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "16:20"}, {"kind": "arr_at_destination", "time": "18:09"}],
+      "source": "narrative", "notes": "gate-checked carry-on"
+    },
+    {
+      "id": "B6", "date": "2018-07-12", "flight": "DY7196", "airline": "DY", "pnr": "QREZTQ",
+      "depAirport": "BCN", "depTerminal": null, "arrAirport": "EWR", "arrTerminal": null,
+      "schedDepLocal": "18:25", "schedArrLocal": "21:00",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "00:20", "nextDay": true}, {"kind": "arr_at_destination", "time": "01:30", "nextDay": true}],
+      "source": "narrative", "notes": "narrative 7/13/18 → 2018-07-12 typo; ~3h gap suggests delay or slow customs"
+    },
+    {
+      "id": "B7", "date": "2018-08-17", "flight": "DL1106", "airline": "DL", "pnr": "HMSZ3O",
+      "depAirport": "SFO", "depTerminal": null, "arrAirport": "JFK", "arrTerminal": "T4",
+      "schedDepLocal": "11:15", "schedArrLocal": "20:15",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "21:15"}, {"kind": "arr_at_destination", "time": "22:20"}],
+      "source": "narrative"
+    },
+    {
+      "id": "B8", "date": "2019-08-30", "flight": "DL592", "airline": "DL", "pnr": null,
+      "depAirport": "SFO", "depTerminal": "T1", "arrAirport": "JFK", "arrTerminal": "T4",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "21:17"}, {"kind": "arr_at_destination", "time": "22:20"}],
+      "source": "narrative"
+    },
+    {
+      "id": "B9", "date": "2019-11-03", "flight": "DL1859", "airline": "DL", "pnr": null,
+      "depAirport": "SFO", "depTerminal": "T1", "arrAirport": "JFK", "arrTerminal": "T2",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "16:38"}, {"kind": "arr_at_destination", "time": "18:10"}],
+      "source": "narrative", "notes": "narrative T4 overridden by Flighty T2"
+    },
+    {
+      "id": "B10", "date": "2019-12-30", "flight": "DL2164", "airline": "DL", "pnr": null,
+      "depAirport": "LAX", "depTerminal": "T2", "arrAirport": "JFK", "arrTerminal": "T4",
+      "schedDepLocal": "09:40", "schedArrLocal": "17:55",
+      "bags": "checked", "transit": "car", "party": "group_with_kids", "tsaPrecheck": false,
+      "depAddressId": "mil_long_beach", "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "19:23"}, {"kind": "arr_at_destination", "time": "20:43"}],
+      "source": "narrative", "notes": "stroller gate check, 3 bags"
+    },
+    {
+      "id": "B11", "date": "2020-02-07", "flight": "AF6", "airline": "AF", "pnr": null,
+      "depAirport": "CDG", "depTerminal": "T2E", "arrAirport": "JFK", "arrTerminal": "T1",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "16:40"}, {"kind": "arr_at_destination", "time": "18:20"}],
+      "source": "narrative", "notes": "3 bags work gear; international with customs"
+    },
+    {
+      "id": "B12", "date": "2020-08-14", "flight": "DL792", "airline": "DL", "pnr": null,
+      "depAirport": "LAX", "depTerminal": null, "arrAirport": "JFK", "arrTerminal": "T4",
+      "schedDepLocal": null, "schedArrLocal": "16:15",
+      "bags": "checked", "transit": "car", "party": "group_with_kids", "tsaPrecheck": false,
+      "depAddressId": "mil_long_beach", "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "16:03"}, {"kind": "arr_at_destination", "time": "17:45"}],
+      "source": "narrative", "notes": "stroller gate check, 2 bags"
+    },
+    {
+      "id": "B13", "date": "2021-01-18", "flight": "DL392", "airline": "DL", "pnr": null,
+      "depAirport": "LAX", "depTerminal": null, "arrAirport": "JFK", "arrTerminal": "T4",
+      "schedDepLocal": null, "schedArrLocal": "17:00",
+      "bags": "carry_on", "transit": "car", "party": "group_with_kids", "tsaPrecheck": false,
+      "depAddressId": "mil_long_beach", "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "16:49"}, {"kind": "arr_at_destination", "time": "18:08"}],
+      "source": "narrative", "notes": "3 seats (21B/20B/20A); stroller gate check only"
+    },
+    {
+      "id": "B14", "date": "2021-08-29", "flight": "DL328", "airline": "DL", "pnr": null,
+      "depAirport": "LAX", "depTerminal": "T2", "arrAirport": "JFK", "arrTerminal": "T4",
+      "schedDepLocal": "21:59", "schedArrLocal": "06:29",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "09:10"}, {"kind": "arr_at_destination", "time": "10:10"}],
+      "source": "narrative", "notes": "narrative 08-30-21 dated by home arrival; flight took off 01:11 ET (3h12m delay) and landed 09:02 ET on 8/30"
+    },
+    {
+      "id": "B15", "date": "2021-11-07", "flight": "DL9348", "airline": "DL", "pnr": null,
+      "depAirport": "AMS", "depTerminal": null, "arrAirport": "JFK", "arrTerminal": "T4",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "15:48"}, {"kind": "arr_at_destination", "time": "17:26"}],
+      "source": "narrative", "notes": "international with customs; AMS via HAM connection"
+    },
+    {
+      "id": "B16", "date": "2022-02-11", "flight": "DL391", "airline": "DL", "pnr": null,
+      "depAirport": "ORD", "depTerminal": "T2", "arrAirport": "LGA", "arrTerminal": "TB",
+      "schedDepLocal": "19:59", "schedArrLocal": null,
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "chicago_state", "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_at_airport", "time": "18:02"}, {"kind": "dep_security", "time": "18:10"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "23:00"}, {"kind": "arr_in_transit", "time": "23:20"}, {"kind": "arr_at_destination", "time": "23:42"}],
+      "source": "narrative", "notes": "Marquee theater pre-trip context ignored"
+    },
+    {
+      "id": "B17", "date": "2022-02-18", "flight": "DL363", "airline": "DL", "pnr": null,
+      "depAirport": "ORD", "depTerminal": "T2", "arrAirport": "LGA", "arrTerminal": "TD",
+      "schedDepLocal": "12:59", "schedArrLocal": "16:37",
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "chicago_state", "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "11:00"}, {"kind": "dep_at_airport", "time": "11:25"}, {"kind": "dep_bags", "time": "11:30"}, {"kind": "dep_security", "time": "11:35"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "16:48"}, {"kind": "arr_bags", "time": "16:55"}, {"kind": "arr_in_transit", "time": "17:05"}, {"kind": "arr_at_destination", "time": "18:05"}],
+      "source": "narrative"
+    },
+    {
+      "id": "B18", "date": "2022-03-13", "flight": "DL556", "airline": "DL", "pnr": null,
+      "depAirport": "ORD", "depTerminal": "T2", "arrAirport": "LGA", "arrTerminal": "TC",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "chicago_state", "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "05:30"}, {"kind": "dep_at_airport", "time": "05:55"}, {"kind": "dep_security", "time": "06:05"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "09:55"}, {"kind": "arr_in_transit", "time": "10:08"}, {"kind": "arr_at_destination", "time": "10:55"}],
+      "source": "narrative", "notes": "highway accident on the way home"
+    },
+    {
+      "id": "B19", "date": "2022-04-14", "flight": "PD143", "airline": "PD", "pnr": null,
+      "depAirport": "YTZ", "depTerminal": null, "arrAirport": "EWR", "arrTerminal": "TB",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "16:08"}, {"kind": "dep_at_airport", "time": "16:30"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "20:15"}, {"kind": "arr_customs", "time": "20:20"}, {"kind": "arr_in_transit", "time": "20:28"}, {"kind": "arr_at_destination", "time": "21:05"}],
+      "source": "narrative", "notes": "Airbnb origin (pre-210 Victoria move-in)"
+    },
+    {
+      "id": "B20", "date": "2022-04-22", "flight": "PD143", "airline": "PD", "pnr": null,
+      "depAirport": "YTZ", "depTerminal": null, "arrAirport": "EWR", "arrTerminal": "TB",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "toronto_victoria", "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "16:52"}, {"kind": "dep_at_airport", "time": "17:08"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "19:45"}, {"kind": "arr_customs", "time": "19:50"}, {"kind": "arr_bags", "time": "20:05"}, {"kind": "arr_in_transit", "time": "20:22"}, {"kind": "arr_at_destination", "time": "21:02"}],
+      "source": "narrative"
+    },
+    {
+      "id": "B21", "date": "2022-05-07", "flight": "AC8970", "airline": "AC", "pnr": null,
+      "depAirport": "YYZ", "depTerminal": "T1", "arrAirport": "LGA", "arrTerminal": "TB",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "carry_on", "transit": "public", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "toronto_victoria", "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "16:59"}, {"kind": "dep_at_airport", "time": "17:55"}, {"kind": "dep_security", "time": "18:16"}, {"kind": "dep_customs", "time": "18:22"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "22:01"}, {"kind": "arr_in_transit", "time": "22:15"}, {"kind": "arr_at_destination", "time": "22:35"}],
+      "source": "narrative", "notes": "narrative 5-7-23 → 2022-05-07 year typo; US preclearance at YYZ T1"
+    },
+    {
+      "id": "B22", "date": "2022-05-22", "flight": "DL5034", "airline": "DL", "pnr": null,
+      "depAirport": "YYZ", "depTerminal": "T3", "arrAirport": "LGA", "arrTerminal": "TB",
+      "schedDepLocal": null, "schedArrLocal": null,
+      "bags": "carry_on", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "toronto_victoria", "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "07:32"}, {"kind": "dep_at_airport", "time": "07:57"}, {"kind": "dep_security", "time": "08:07"}, {"kind": "dep_customs", "time": "08:09"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "10:58"}, {"kind": "arr_in_transit", "time": "11:06"}, {"kind": "arr_at_destination", "time": "11:28"}],
+      "source": "narrative"
+    },
+    {
+      "id": "B23", "date": "2022-06-04", "flight": "AA4824", "airline": "AA", "pnr": null,
+      "depAirport": "YYZ", "depTerminal": "T3", "arrAirport": "LGA", "arrTerminal": "TB",
+      "schedDepLocal": "19:29", "schedArrLocal": null,
+      "bags": "checked", "transit": "public", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "toronto_victoria", "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "16:15"}, {"kind": "dep_at_airport", "time": "17:25"}, {"kind": "dep_bags", "time": "17:45"}, {"kind": "dep_security", "time": "17:50"}, {"kind": "dep_customs", "time": "17:52"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "21:25"}, {"kind": "arr_bags", "time": "21:48"}, {"kind": "arr_in_transit", "time": "21:54"}, {"kind": "arr_at_destination", "time": "22:20"}],
+      "source": "narrative", "notes": "first-terminal rule: dep_at_airport=T1 arrival 17:25"
+    },
+    {
+      "id": "B24", "date": "2022-06-11", "flight": "AA4820", "airline": "AA", "pnr": null,
+      "depAirport": "YYZ", "depTerminal": "T3", "arrAirport": "LGA", "arrTerminal": "TB",
+      "schedDepLocal": "10:55", "schedArrLocal": null,
+      "bags": "carry_on", "transit": "public", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "toronto_victoria", "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "08:01"}, {"kind": "dep_at_airport", "time": "08:56"}, {"kind": "dep_security", "time": "09:18"}, {"kind": "dep_customs", "time": "09:21"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "12:18"}, {"kind": "arr_in_transit", "time": "12:32"}, {"kind": "arr_at_destination", "time": "12:56"}],
+      "source": "narrative"
+    },
+    {
+      "id": "B25", "date": "2022-06-18", "flight": "DL4722", "airline": "DL", "pnr": null,
+      "depAirport": "YYZ", "depTerminal": "T3", "arrAirport": "LGA", "arrTerminal": "TC",
+      "schedDepLocal": "11:37", "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": "toronto_victoria", "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "08:24"}, {"kind": "dep_at_airport", "time": "08:45"}, {"kind": "dep_bags", "time": "09:03"}, {"kind": "dep_security", "time": "09:06"}, {"kind": "dep_customs", "time": "09:11"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "13:19"}, {"kind": "arr_bags", "time": "13:28"}, {"kind": "arr_in_transit", "time": "13:35"}, {"kind": "arr_at_destination", "time": "14:26"}],
+      "source": "narrative", "notes": "last day at 210 Victoria (lease ends Jun 20)"
+    },
+    {
+      "id": "B26", "date": "2022-08-01", "flight": "DL562", "airline": "DL", "pnr": null,
+      "depAirport": "LAX", "depTerminal": "TBIT", "arrAirport": "JFK", "arrTerminal": "T4",
+      "schedDepLocal": "11:10", "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "group_with_kids", "tsaPrecheck": false,
+      "depAddressId": "mil_long_beach", "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "07:32"}, {"kind": "dep_at_airport", "time": "08:27"}, {"kind": "dep_bags", "time": "09:20"}, {"kind": "dep_security", "time": "09:32"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "20:10"}, {"kind": "arr_bags", "time": "20:30"}, {"kind": "arr_in_transit", "time": "20:38"}, {"kind": "arr_at_destination", "time": "21:20"}],
+      "source": "narrative", "notes": "narrative LAX T3 overridden by Flighty TBIT; Kid Car at JFK arrival"
+    },
+    {
+      "id": "B27", "date": "2022-08-12", "flight": "AC718", "airline": "AC", "pnr": null,
+      "depAirport": "YYZ", "depTerminal": "T1", "arrAirport": "LGA", "arrTerminal": "TB",
+      "schedDepLocal": "16:55", "schedArrLocal": null,
+      "bags": "checked", "transit": "car", "party": "solo", "tsaPrecheck": false,
+      "depAddressId": null, "arrAddressId": "home_192nd",
+      "depMilestones": [{"kind": "dep_in_transit", "time": "13:45"}, {"kind": "dep_at_airport", "time": "14:30"}, {"kind": "dep_bags", "time": "14:38"}, {"kind": "dep_security", "time": "14:48"}, {"kind": "dep_customs", "time": "14:53"}],
+      "arrMilestones": [{"kind": "arr_off_plane", "time": "18:57"}, {"kind": "arr_bags", "time": "19:13"}, {"kind": "arr_in_transit", "time": "19:22"}, {"kind": "arr_at_destination", "time": "19:50"}],
+      "source": "narrative", "notes": "Mirvish theater origin (244 Victoria St); hotel stay not tracked"
+    }
+  ]
+}
