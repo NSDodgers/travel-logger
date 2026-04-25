@@ -27,7 +27,11 @@ create table public.airports (
   city    text,
   country text,
   -- IANA tz; allow multi-component zones (America/Argentina/Buenos_Aires, Etc/GMT+5, etc.)
-  tz      text not null check (tz ~ '^[A-Za-z_0-9+-]+(/[A-Za-z_0-9+-]+)*$')
+  tz      text not null check (tz ~ '^[A-Za-z_0-9+-]+(/[A-Za-z_0-9+-]+)*$'),
+  -- M14: coords from OpenFlights for Mapbox Directions live drive-time math.
+  -- Nullable because a small number of OpenFlights rows lack coords.
+  lat     double precision,
+  lng     double precision
 );
 
 -- ─── Addresses ────────────────────────────────────────────────────────────
@@ -184,7 +188,7 @@ create index on public.predictions (actual_trip_id) where actual_trip_id is not 
 -- ─── API views (what PostgREST exposes) ───────────────────────────────────
 
 create view api.airports as
-  select iata, name, city, country, tz from public.airports;
+  select iata, name, city, country, tz, lat, lng from public.airports;
 
 create view api.milestone_kinds as
   select kind, direction, order_seq, label, shown_when_carry_on from public.milestone_kinds;
