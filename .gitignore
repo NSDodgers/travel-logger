@@ -27,6 +27,13 @@ services/*/node_modules/
 # Claude Code per-machine permission grants
 .claude/settings.local.json
 
+# QA browser profile (local Playwright persistent context — has cookies)
+.qa-profile/
+.qa-profile-show/
+
+# Bun root lockfile (services have their own)
+bun.lock
+
 # Editor / OS
 .DS_Store
 .idea/

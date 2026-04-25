@@ -1,0 +1,14 @@
+{
+  "name": "travel-logger",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "qa": "bun run scripts/qa.ts",
+    "qa:daemon": "bun run scripts/qa.ts --daemon"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0",
+    "@types/bun": "latest",
+    "typescript": "^5.5.0"
+  }
+}
