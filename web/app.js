@@ -6,7 +6,8 @@
 // header and tab bar. Handlers receive (root, params) and render into <main>.
 
 import { logScreen } from './screens/log.js';
-import { predictScreen, historyScreen } from './screens/placeholder.js';
+import { predictScreen } from './screens/placeholder.js';
+import { historyListScreen, historyTimelineScreen } from './screens/history.js';
 import {
   addressesListScreen,
   addressAddScreen,
@@ -21,7 +22,8 @@ const routes = [
   { pattern: '/',               handler: logScreen },
   { pattern: '/log',            handler: logScreen },
   { pattern: '/predict',        handler: predictScreen },
-  { pattern: '/history',        handler: historyScreen },
+  { pattern: '/history',        handler: historyListScreen },
+  { pattern: '/history/:id',    handler: historyTimelineScreen },
   { pattern: '/addresses',      handler: addressesListScreen },
   { pattern: '/addresses/new',  handler: addressAddScreen },
   { pattern: '/addresses/:id',  handler: addressEditScreen },
