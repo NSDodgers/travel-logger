@@ -165,41 +165,23 @@ services:
       PGPASSWORD_FILE: /run/secrets/pg_password
       BACKUP_CRON_HOUR: "03"    # 3 AM local
       RETENTION_DAYS: "30"
+      # B2 off-site upload (M12). If the b2_* secrets are not mounted,
+      # backup.sh skips the upload step gracefully.
+      B2_BUCKET: travel-logger-wal
+      B2_PREFIX: pg_dumps
     secrets:
       - pg_password
+      - b2_key_id
+      - b2_application_key
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - travel
 
-  # ──────────────────────────────────────────────────────────────────────
-  # wal-g continuous WAL archiving to Backblaze B2 — deferred to M12
-  # Uncomment in M12 after configuring wal-g postgres image + archive_command.
-  # ──────────────────────────────────────────────────────────────────────
-  # walg:
-  #   image: ghcr.io/wal-g/wal-g:latest  # TODO: pin digest in M12
-  #   container_name: travel-walg
-  #   restart: unless-stopped
-  #   environment:
-  #     WALG_S3_PREFIX: s3://travel-logger-wal/
-  #     AWS_ENDPOINT: https://s3.us-west-000.backblazeb2.com
-  #     AWS_REGION: us-west-000
-  #     AWS_ACCESS_KEY_ID_FILE: /run/secrets/b2_key_id
-  #     AWS_SECRET_ACCESS_KEY_FILE: /run/secrets/b2_application_key
-  #     WALG_LIBSODIUM_KEY_FILE: /run/secrets/walg_libsodium_key   # optional client-side encryption
-  #     PGHOST: postgres
-  #     PGUSER: postgres
-  #     PGPASSWORD_FILE: /run/secrets/pg_password
-  #   secrets:
-  #     - b2_key_id
-  #     - b2_application_key
-  #     - pg_password
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   networks:
-  #     - travel
+  # M12 chose dump-to-B2 (24h RPO) over continuous WAL archiving — see
+  # docs/RECOVERY.md. The pgbackup service above handles all backup paths.
+  # If point-in-time recovery is ever needed, layer wal-g on top here.
 
 volumes:
   pgdata:
@@ -227,10 +209,9 @@ secrets:
     file: ./secrets/authelia_reset_jwt.txt
   mapbox_token:
     file: ./secrets/mapbox_token.txt
-  # Uncomment in M12 with walg:
-  # b2_key_id:
-  #   file: ./secrets/b2_key_id.txt
-  # b2_application_key:
-  #   file: ./secrets/b2_application_key.txt
-  # walg_libsodium_key:
-  #   file: ./secrets/walg_libsodium_key.txt
+  # M12: pg_dump → B2 nightly mirror (24h RPO, no continuous WAL).
+  # If/when point-in-time recovery is needed, layer wal-g on top.
+  b2_key_id:
+    file: ./secrets/b2_key_id.txt
+  b2_application_key:
+    file: ./secrets/b2_application_key.txt
