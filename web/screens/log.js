@@ -53,6 +53,19 @@ export async function logScreen(root) {
       state.international = false;
     }
     renderScreen(root);
+
+    // M14: Predict→Log handoff. If the user just hit "Start this trip" on
+    // a prediction, window.__predictHandoff carries the form values they
+    // typed; auto-open the matching start sheet pre-filled. Read-once.
+    const handoff = window.__predictHandoff;
+    if (handoff && !state.trip) {
+      window.__predictHandoff = null;
+      if (handoff.direction === 'departure') {
+        openDepStartSheet(handoff);
+      } else {
+        openArrivalStartSheet(handoff);
+      }
+    }
   } catch (err) {
     console.error('logScreen failed:', err);
     renderFatal(root, err);
@@ -454,7 +467,7 @@ function openEditVoidSheet(root, milestoneId, kind) {
 
 // ── Trip-start sheet ───────────────────────────────────────────────────────
 
-async function openDepStartSheet() {
+async function openDepStartSheet(handoff = null) {
   // Fetch sticky vars + address book in parallel before opening the sheet.
   const [addressesRes, lastTripRes] = await Promise.all([
     api.get('/addresses?archived=eq.false&order=updated_at.desc').catch(() => []),
@@ -463,25 +476,28 @@ async function openDepStartSheet() {
   state.addresses = Array.isArray(addressesRes) ? addressesRes : [];
   lastTrip = (Array.isArray(lastTripRes) && lastTripRes[0]) || null;
 
-  const initialBags    = stickyBags(lastTrip?.bags);
-  const initialParty   = lastTrip?.party   || 'solo';
-  const initialTransit = lastTrip?.transit || 'car';
-  const initialTsa     = !!lastTrip?.tsa_precheck;
-  const initialAddrId  = lastTrip?.address_id || state.addresses[0]?.id || '';
+  // Handoff (M14: predict→trip) overrides sticky-from-last-trip defaults so
+  // the values the user just typed into Predict are preserved exactly.
+  const initialBags    = handoff?.bags          ?? stickyBags(lastTrip?.bags);
+  const initialParty   = handoff?.party         ?? lastTrip?.party   ?? 'solo';
+  const initialTransit = handoff?.transit       ?? lastTrip?.transit ?? 'car';
+  const initialTsa     = handoff?.tsa_precheck  ?? !!lastTrip?.tsa_precheck;
+  const initialIntl    = handoff?.international ?? false;
+  const initialAddrId  = handoff?.origin_id     ?? lastTrip?.address_id ?? state.addresses[0]?.id ?? '';
 
   const draft = {
     address_id: initialAddrId,
-    dep_airport: null,        // {iata,name,city,tz}
+    dep_airport: handoff?.airport ?? null,    // {iata,name,city,tz,lat,lng}
     arr_airport: null,
-    sched_dep_date: '',
-    sched_dep_time: '',
+    sched_dep_date: handoff?.sched_dep_date ?? '',
+    sched_dep_time: handoff?.sched_dep_time ?? '',
     sched_arr_date: '',
     sched_arr_time: '',
     bags: initialBags,
     party: initialParty,
     transit: initialTransit,
     tsa_precheck: initialTsa,
-    international: false,
+    international: initialIntl,
     test: false,              // M11: never sticky — always re-confirm per trip
   };
 
@@ -604,11 +620,12 @@ async function openDepStartSheet() {
         close();
       });
 
-      // Airport pickers.
+      // Airport pickers — handoff from Predict pre-fills dep_airport.
       mountAirportPicker(sheetRoot.querySelector('#dep-airport-slot'), {
         id: 'dep-airport',
         label: 'Departure airport',
         placeholder: 'IATA, city, or name',
+        initial: draft.dep_airport || undefined,
         onChange: (a) => {
           draft.dep_airport = a;
           if (a?.iata && a?.tz) airportTzCache.set(a.iata, a.tz);
@@ -626,13 +643,15 @@ async function openDepStartSheet() {
         },
       });
 
-      // Datetime fields.
+      // Datetime fields — handoff pre-fills the dep half.
       const fields = {
         depDate: sheetRoot.querySelector('#sched-dep-date'),
         depTime: sheetRoot.querySelector('#sched-dep-time'),
         arrDate: sheetRoot.querySelector('#sched-arr-date'),
         arrTime: sheetRoot.querySelector('#sched-arr-time'),
       };
+      if (draft.sched_dep_date) fields.depDate.value = draft.sched_dep_date;
+      if (draft.sched_dep_time) fields.depTime.value = draft.sched_dep_time;
       Object.entries(fields).forEach(([k, el]) => {
         el.addEventListener('change', () => {
           draft[`sched_${k.startsWith('dep') ? 'dep' : 'arr'}_${k.endsWith('Date') ? 'date' : 'time'}`] = el.value;
@@ -766,7 +785,7 @@ function stickyBags(prev) {
 // auto-fills from the most-recent completed *departure* trip's arr_airport
 // (with a "Change" affordance); everything else (bags/party/transit/tsa/
 // international) is sticky from the same dep trip.
-async function openArrivalStartSheet() {
+async function openArrivalStartSheet(handoff = null) {
   const [addressesRes, lastDepRes] = await Promise.all([
     api.get('/addresses?archived=eq.false&order=updated_at.desc').catch(() => []),
     api.get('/trips?direction=eq.departure&status=eq.complete&order=created_at.desc&limit=1').catch(() => []),
@@ -774,9 +793,14 @@ async function openArrivalStartSheet() {
   state.addresses = Array.isArray(addressesRes) ? addressesRes : [];
   const lastDep = (Array.isArray(lastDepRes) && lastDepRes[0]) || null;
 
-  // Auto-fill from last departure trip; user can override the airport in-sheet.
+  // Auto-fill from last departure trip OR from a Predict→trip handoff.
+  // Handoff wins for the airport, address, and trip vars; lastDep still
+  // carries forward the originating dep_airport silently.
   let depAirport = null, arrAirport = null;
-  if (lastDep?.arr_airport) {
+  if (handoff?.airport) {
+    arrAirport = handoff.airport;
+    if (arrAirport.iata && arrAirport.tz) airportTzCache.set(arrAirport.iata, arrAirport.tz);
+  } else if (lastDep?.arr_airport) {
     arrAirport = await fetchAirport(lastDep.arr_airport);
     if (arrAirport?.iata && arrAirport?.tz) airportTzCache.set(arrAirport.iata, arrAirport.tz);
   }
@@ -785,14 +809,14 @@ async function openArrivalStartSheet() {
   }
 
   const draft = {
-    address_id: state.addresses[0]?.id || '',  // user picks destination
+    address_id: handoff?.origin_id ?? state.addresses[0]?.id ?? '',
     dep_airport: depAirport,        // carried forward silently
     arr_airport: arrAirport,        // editable
-    bags:           stickyBags(lastDep?.bags),
-    party:          lastDep?.party  || 'solo',
-    transit:        lastDep?.transit || 'car',
-    tsa_precheck:   !!lastDep?.tsa_precheck,
-    international:  !!lastDep?.international,
+    bags:           handoff?.bags          ?? stickyBags(lastDep?.bags),
+    party:          handoff?.party         ?? lastDep?.party   ?? 'solo',
+    transit:        handoff?.transit       ?? lastDep?.transit ?? 'car',
+    tsa_precheck:   handoff?.tsa_precheck  ?? !!lastDep?.tsa_precheck,
+    international:  handoff?.international ?? !!lastDep?.international,
     test:           false,        // M11: never sticky — always re-confirm per trip
   };
 
