@@ -8,27 +8,35 @@
 <meta name="theme-color" content="#000000">
 <title>Travel Logger</title>
 <link rel="manifest" href="/manifest.json">
-<style>
-  :root { color-scheme: dark; }
-  html, body { margin: 0; padding: 0; background: #000; color: #fff; }
-  body {
-    font: 17px/1.4 -apple-system, system-ui, 'SF Pro Text', sans-serif;
-    min-height: 100vh;
-    display: grid;
-    place-items: center;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  }
-  .wrap { max-width: 480px; padding: 24px; text-align: center; }
-  h1 { font-size: 32px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.02em; }
-  .accent { color: #FF9F0A; }
-  .meta { color: #8E8E93; font-size: 14px; margin-top: 16px; }
-</style>
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div class="wrap">
-    <h1>Travel Logger</h1>
-    <p class="accent">M2 — stack online</p>
-    <p class="meta">The real UI lands in M7. You're seeing this because Caddy is serving static files and Authelia let you through.</p>
+  <div class="app" data-tab="log">
+    <header class="app-header">
+      <button class="header-btn header-btn--left" id="back-btn" hidden aria-label="Back">‹</button>
+      <h1 class="app-title" id="app-title">Travel Logger</h1>
+      <button class="header-btn header-btn--right" id="primary-action" aria-label="Addresses">Addresses</button>
+    </header>
+    <main class="app-main" id="screen" aria-live="polite"></main>
+    <nav class="tab-bar" aria-label="Primary">
+      <a href="#/log" class="tab" data-tab="log">
+        <span class="tab-icon" aria-hidden="true">●</span>
+        <span class="tab-label">Log</span>
+      </a>
+      <a href="#/predict" class="tab" data-tab="predict">
+        <span class="tab-icon" aria-hidden="true">◐</span>
+        <span class="tab-label">Predict</span>
+      </a>
+      <a href="#/history" class="tab" data-tab="history">
+        <span class="tab-icon" aria-hidden="true">☰</span>
+        <span class="tab-label">History</span>
+      </a>
+    </nav>
   </div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/config.js"></script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>
