@@ -80,12 +80,13 @@ function applyChrome(chrome) {
   }
 }
 
-function render() {
+async function render() {
   const path = parseHash();
   const { handler, params } = resolve(path);
   screenEl.innerHTML = '';
   try {
-    const chrome = handler(screenEl, params) ?? {};
+    // Screens can be async (they load data before returning their chrome).
+    const chrome = (await handler(screenEl, params)) ?? {};
     applyChrome(chrome);
     screenEl.scrollTop = 0;
   } catch (err) {

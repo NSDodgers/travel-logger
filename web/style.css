@@ -74,7 +74,7 @@ a { color: var(--accent); text-decoration: none; }
 
 .app-header {
   display: grid;
-  grid-template-columns: 60px 1fr 100px;
+  grid-template-columns: minmax(44px, auto) 1fr minmax(44px, auto);
   align-items: center;
   height: var(--header-h);
   padding: 0 8px;
@@ -83,11 +83,15 @@ a { color: var(--accent); text-decoration: none; }
 }
 
 .app-title {
+  grid-column: 2;
   margin: 0;
   font-size: 17px;
   font-weight: 600;
   text-align: center;
   letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-btn {
@@ -98,8 +102,8 @@ a { color: var(--accent); text-decoration: none; }
   border-radius: var(--radius-sm);
   white-space: nowrap;
 }
-.header-btn--left { justify-self: start; font-size: 28px; line-height: 1; }
-.header-btn--right { justify-self: end; }
+.header-btn--left  { grid-column: 1; justify-self: start; font-size: 28px; line-height: 1; }
+.header-btn--right { grid-column: 3; justify-self: end; }
 .header-btn:active { background: var(--surface); }
 .header-btn[hidden] { display: none; }
 

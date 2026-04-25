@@ -48,11 +48,14 @@
 
 	# ─── Route: predict service ─────────────────────────────────────────
 	handle @api_predict {
+		uri strip_prefix /api
 		reverse_proxy bun-predict:3001
 	}
 
 	# ─── Route: PostgREST ───────────────────────────────────────────────
+	# PostgREST serves table resources at /, so we strip /api before proxying.
 	handle @api {
+		uri strip_prefix /api
 		reverse_proxy postgrest:3000
 	}
 
@@ -71,6 +74,10 @@
 	handle {
 		root * /srv
 		try_files {path} /index.html
+		# Single-user, low traffic, fast iteration — disable caching so
+		# the browser always picks up fresh JS/CSS without query-param
+		# busting. Revisit when we register a service worker in M8.
+		header Cache-Control "no-store"
 		file_server
 	}
 
