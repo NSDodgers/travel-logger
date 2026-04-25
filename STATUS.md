@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-04-24 after M5. Update this file at the end of each milestone._
+_Last updated: 2026-04-24 after M6. Update this file at the end of each milestone._
 
 ## Milestones
 
@@ -11,8 +11,9 @@ _Last updated: 2026-04-24 after M5. Update this file at the end of each mileston
 | M3 | ✅ | `travel.myhometech.app` live, login works on iPhone |
 | M4 | ✅ | 5,515 airports seeded |
 | M5 | ✅ | Historical import: 231 trips + 536 milestones loaded (2017-08 → 2026-04). 14 addresses, 8 sources reconciled. See `docs/M5_INVENTORY.md` + `docs/M5_QUIZ*.md`; re-run via `./scripts/load-legacy.sh` |
-| **M6** | **⏳ next** | Address book + Mapbox. PWA shell scaffold; Mapbox Search JS Core autocomplete; address add/edit/archive. See `docs/M6_BRIEF.md` |
-| M7–M13 | planned | See `implementation_plan.md` §8 |
+| M6 | ✅ | PWA shell + address book. 14 legacy labels renamed to human-readable. Mapbox Search REST + static-image pin; add/edit/archive wired through PostgREST. Caddy shim exposes `/config.js` from the `mapbox_token` secret at startup. See `docs/M6_BRIEF.md` for spec. |
+| **M7** | **⏳ next** | Log grid + edit/undo + departure flow. See `implementation_plan.md` §8. |
+| M8–M13 | planned | See `implementation_plan.md` §8 |
 
 ## Currently running on Mac Studio
 
@@ -85,6 +86,12 @@ Every file in `./secrets/` is `chmod 0600`, gitignored. Regenerated via `./scrip
 | `52245d6` | M5 loader script |
 | `e6c4cb5` | M5 milestones_history FK fix (deferrable for bulk loads) |
 | `2d62c20` | M5 marked complete |
+| `40f90b4` | M6 legacy address rename migration (+ loader sync) |
+| `aec8e08` | M6 Caddy `/config.js` startup shim |
+| `1ce79f4` | M6 PWA shell scaffold |
+| `81bb543` | M6 address list view |
+| `f110cdc` | M6 add-address flow (Mapbox Search REST + static image) |
+| `0958667` | M6 edit + archive flows |
 
 Diff against `main` (what changed since last push): `git log --oneline origin/main..HEAD` — should be empty if everything's pushed.
 
@@ -92,7 +99,10 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 
 - `bun-predict` skeleton only has `/api/predict/health`. `POST /api/predict` returns 501. Real percentile + widening math lands in M10.
 - `walg` container is stubbed in `compose.yml` (commented out). Gets activated in M12.
-- `web/index.html` is a placeholder. PWA shell + first feature (address book) lands in M6; trip-logging UI in M7.
+- `web/index.html` is now the real PWA shell (M6). M7 adds the trip-logging grid on top.
+- `public.addresses` has no `updated_at` trigger. M6 edit/archive PATCHes bump it client-side so the list re-sorts. A proper BEFORE UPDATE trigger should land when we touch lifecycle plumbing in M7.
+- `web/icon.svg` is a placeholder (amber "T" on black). Nick can design real icons + an Apple-touch PNG before M11 "first real trip."
+- Mapbox token must have `https://travel.myhometech.app/*` and `http://127.0.0.1:8090/*` in its URL restriction before M6 is reachable end-to-end.
 - No tests exist yet. Plan's §4 test diagram needs to start getting filled in alongside M7–M10.
 
 ## Schema additions from M5
@@ -100,7 +110,10 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 - `trips.party` enum expanded from `solo|family` → `solo|group_with_kids|group_without_kids`. Existing app code that hardcoded `family` should migrate to `group_with_kids`.
 - New milestone kinds: `dep_customs` (departure-side, e.g. YYZ US preclearance) and `arr_customs` (arrival-side, between off-plane and bags). Order_seq for existing arrival kinds bumped by 1.
 - `milestones_history.milestone_id` FK is now `deferrable initially immediate` so bulk loaders can use `set constraints deferred`.
-- 14 legacy addresses live in `public.addresses` with labels prefixed `legacy:` (e.g. `legacy:home_192nd`). The label prefix is a wipe marker — `delete from public.addresses where label like 'legacy:%'` cleans them up before re-loading.
+
+## Schema changes in M6
+
+- 14 legacy addresses renamed from `legacy:<slug>` → clean labels (Home, Mom's, Steppenwolf, etc.) via `db/migrations/002-rename-legacy-addresses.sql`. `import-legacy.ts` carries the slug→label map so a wipe+reload reproduces the renamed state; its wipe still sweeps `legacy:%` as a defensive fallback.
 
 ## External accounts / dashboards
 
@@ -114,8 +127,8 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 ## If Claude is starting a fresh session
 
 1. Read this file first.
-2. Read `implementation_plan.md` — the canonical plan (M6 details in §8 + §10 UI spec).
+2. Read `implementation_plan.md` — the canonical plan (M7 details in §8, UI spec in §10, log grid in §10).
 3. Read `CLAUDE.md` — project brief + skill routing.
 4. Memory at `~/.claude/projects/-Users-nicksolyom-Code-travel-logger/memory/MEMORY.md` has cross-session context (decisions, gotchas).
-5. For M6 specifically, read `docs/M6_BRIEF.md`.
-6. M5 reference (read only if M5 context is needed): `docs/M5_INVENTORY.md`, `docs/M5_QUIZ.md`, `docs/M5_QUIZ_2.md`.
+5. M6 reference (UI spec, shell structure): `docs/M6_BRIEF.md`, `web/app.js` (hash router), `web/screens/`.
+6. M5 reference (only if historical data context is needed): `docs/M5_INVENTORY.md`, `docs/M5_QUIZ.md`, `docs/M5_QUIZ_2.md`.
