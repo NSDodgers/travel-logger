@@ -115,10 +115,15 @@ console.log(`predict service listening on :${server.port}`);
 // ── Handler ─────────────────────────────────────────────────────────────
 
 async function handlePredict(req: PredictRequest): Promise<Response> {
-  // Look up the airport's tz once. Any unknown IATA is a 400 — the airports
-  // table is the source of truth and the form's picker only lists rows from it.
-  const airportRows = await sql<{ iata: string; tz: string; name: string; city: string | null }[]>`
-    select iata, tz, name, city
+  // Look up the airport's coords + tz. Any unknown IATA is a 400 — the
+  // airports table is the source of truth and the form's picker only lists
+  // rows from it. lat/lng can be null for a small handful of OpenFlights
+  // rows missing coords; the frontend handles the missing case.
+  const airportRows = await sql<{
+    iata: string; tz: string; name: string; city: string | null;
+    lat: number | null; lng: number | null;
+  }[]>`
+    select iata, tz, name, city, lat, lng
     from public.airports
     where iata = ${req.airport}
     limit 1
@@ -139,17 +144,16 @@ async function handlePredict(req: PredictRequest): Promise<Response> {
     tsa_precheck: req.tsa_precheck,
   };
 
-  const filters: FilterSet = { ...startFilters };
-  const relaxed: string[] = [];
-  let result = await runQuery(req.direction, filters);
+  // Each query (full trip, drive segment, airport segment) gets its own
+  // widening loop because each segment has its own sample size — drive may
+  // hit N≥5 quickly while airport stays at N=2 and needs more relaxation.
+  const trip    = await withWidening(runQuery,                req.direction, startFilters);
+  const drive   = await withWidening(runDriveSegmentQuery,    req.direction, startFilters);
+  const airportSeg = await withWidening(runAirportSegmentQuery, req.direction, startFilters);
 
-  for (const field of DROP_ORDER) {
-    if (result.sample_n >= 5) break;
-    if (filters[field] === null) continue;
-    (filters as any)[field] = null;
-    relaxed.push(field);
-    result = await runQuery(req.direction, filters);
-  }
+  const result = trip.result;
+  const relaxed = trip.relaxed;
+  const filters = trip.filters;
 
   // Classify the result and compute the leave-by offset.
   let kind: "empty" | "low_n" | "full";
@@ -203,7 +207,10 @@ async function handlePredict(req: PredictRequest): Promise<Response> {
     kind,
     prediction_id: predRow.id,
     direction: req.direction,
-    airport: { iata: airport.iata, name: airport.name, city: airport.city, tz: airport.tz },
+    airport: {
+      iata: airport.iata, name: airport.name, city: airport.city, tz: airport.tz,
+      lat: airport.lat, lng: airport.lng,
+    },
     applied_filters: filtersJson,
     relaxed_filters: relaxed,
     sample_n: result.sample_n,
@@ -214,6 +221,28 @@ async function handlePredict(req: PredictRequest): Promise<Response> {
     min_s: result.min_s,
     max_s: result.max_s,
     durations_s: result.durations_s,
+    // Per-segment durations (M14). Each segment has its own widening so
+    // drive can hit N≥5 with tight filters while airport widens further.
+    // Frontend uses drive.* alongside live Mapbox time as the breakdown,
+    // and airport.p90_s for the airport-side anchor.
+    segments: {
+      drive: {
+        sample_n: drive.result.sample_n,
+        p50_s: drive.result.p50_s,
+        p90_s: drive.result.p90_s,
+        min_s: drive.result.min_s,
+        max_s: drive.result.max_s,
+        relaxed_filters: drive.relaxed,
+      },
+      airport: {
+        sample_n: airportSeg.result.sample_n,
+        p50_s: airportSeg.result.p50_s,
+        p90_s: airportSeg.result.p90_s,
+        min_s: airportSeg.result.min_s,
+        max_s: airportSeg.result.max_s,
+        relaxed_filters: airportSeg.relaxed,
+      },
+    },
     flight_local: `${req.flight_date_local}T${req.flight_time_local}`,
     flight_utc: flightUtc.toISOString(),
     leave_by_utc: leaveByUtc?.toISOString() ?? null,
@@ -223,6 +252,26 @@ async function handlePredict(req: PredictRequest): Promise<Response> {
     comfortable_local: comfortableUtc ? formatLocal(comfortableUtc, airport.tz) : null,
     comfortable_offset_s: kind === "full" ? result.p50_s : null,
   });
+}
+
+// ── Widening helper — one loop per query function ───────────────────────
+
+async function withWidening(
+  queryFn: (direction: Direction, f: FilterSet) => Promise<QueryResult>,
+  direction: Direction,
+  startFilters: FilterSet,
+): Promise<{ result: QueryResult; relaxed: string[]; filters: FilterSet }> {
+  const filters: FilterSet = { ...startFilters };
+  const relaxed: string[] = [];
+  let result = await queryFn(direction, filters);
+  for (const field of DROP_ORDER) {
+    if (result.sample_n >= 5) break;
+    if (filters[field] === null) continue;
+    (filters as any)[field] = null;
+    relaxed.push(field);
+    result = await queryFn(direction, filters);
+  }
+  return { result, relaxed, filters };
 }
 
 // ── SQL ─────────────────────────────────────────────────────────────────
@@ -275,6 +324,136 @@ async function runQuery(direction: Direction, f: FilterSet): Promise<QueryResult
       max(duration_s)                                          as max_s,
       (array_agg(duration_s order by duration_s))[1:200]       as durations_s
     from per_trip
+  `;
+  const r = rows[0];
+  return {
+    sample_n: r.sample_n,
+    incomplete_n: r.incomplete_n,
+    complete_n: r.complete_n,
+    p50_s: r.p50_s,
+    p90_s: r.p90_s,
+    min_s: r.min_s,
+    max_s: r.max_s,
+    durations_s: r.durations_s ?? [],
+  };
+}
+
+// Drive segment: the "in transit ↔ at airport" leg. For departures this is
+// home → airport; for arrivals it's airport → destination. Requires both
+// milestones to exist and be non-void; trips with only one of them
+// contribute nothing.
+async function runDriveSegmentQuery(direction: Direction, f: FilterSet): Promise<QueryResult> {
+  const airportCol = direction === "departure" ? sql`t.dep_airport` : sql`t.arr_airport`;
+  const startKind  = direction === "departure" ? "dep_in_transit"  : "arr_in_transit";
+  const endKind    = direction === "departure" ? "dep_at_airport"  : "arr_at_destination";
+
+  const rows = await sql<{
+    sample_n: number;
+    incomplete_n: number;
+    complete_n: number;
+    p50_s: number | null;
+    p90_s: number | null;
+    min_s: number | null;
+    max_s: number | null;
+    durations_s: number[] | null;
+  }[]>`
+    with pairs as (
+      select
+        m1.trip_id,
+        t.status,
+        extract(epoch from (m2.logged_at - m1.logged_at))::float8 as gap_s
+      from public.milestones m1
+      join public.milestones m2 on m2.trip_id = m1.trip_id
+      join public.trips t on t.id = m1.trip_id
+      where m1.void = false and m2.void = false
+        and m1.kind = ${startKind}
+        and m2.kind = ${endKind}
+        and m2.logged_at > m1.logged_at
+        and t.direction = ${direction}
+        and ${airportCol} = ${f.airport}
+        and t.international = ${f.international}
+        and t.test = false
+        and t.status <> 'in_progress'
+        and (${f.bags}::text is null or t.bags = ${f.bags}::text)
+        and (${f.party}::text is null or t.party = ${f.party}::text)
+        and (${f.transit}::text is null or t.transit = ${f.transit}::text)
+        and (${f.tsa_precheck}::boolean is null or t.tsa_precheck = ${f.tsa_precheck}::boolean)
+    )
+    select
+      count(*)::int                                       as sample_n,
+      count(*) filter (where status = 'abandoned')::int   as incomplete_n,
+      count(*) filter (where status = 'complete')::int    as complete_n,
+      percentile_cont(0.50) within group (order by gap_s) as p50_s,
+      percentile_cont(0.90) within group (order by gap_s) as p90_s,
+      min(gap_s)                                          as min_s,
+      max(gap_s)                                          as max_s,
+      (array_agg(gap_s order by gap_s))[1:200]            as durations_s
+    from pairs
+  `;
+  const r = rows[0];
+  return {
+    sample_n: r.sample_n,
+    incomplete_n: r.incomplete_n,
+    complete_n: r.complete_n,
+    p50_s: r.p50_s,
+    p90_s: r.p90_s,
+    min_s: r.min_s,
+    max_s: r.max_s,
+    durations_s: r.durations_s ?? [],
+  };
+}
+
+// Airport segment: time spent ON the airport side of the trip. For
+// departures: at_airport → max(at_airport|bags|security|customs). For
+// arrivals: off_plane → max(off_plane|customs|bags). Requires ≥2 logged
+// airport-side milestones (otherwise the gap is 0 — skip).
+async function runAirportSegmentQuery(direction: Direction, f: FilterSet): Promise<QueryResult> {
+  const airportCol = direction === "departure" ? sql`t.dep_airport` : sql`t.arr_airport`;
+  const airportKinds = direction === "departure"
+    ? ["dep_at_airport", "dep_bags", "dep_security", "dep_customs"]
+    : ["arr_off_plane", "arr_customs", "arr_bags"];
+
+  const rows = await sql<{
+    sample_n: number;
+    incomplete_n: number;
+    complete_n: number;
+    p50_s: number | null;
+    p90_s: number | null;
+    min_s: number | null;
+    max_s: number | null;
+    durations_s: number[] | null;
+  }[]>`
+    with airport_window as (
+      select
+        m.trip_id,
+        t.status,
+        extract(epoch from (max(m.logged_at) - min(m.logged_at)))::float8 as gap_s
+      from public.milestones m
+      join public.trips t on t.id = m.trip_id
+      where m.void = false
+        and m.kind = any(${airportKinds})
+        and t.direction = ${direction}
+        and ${airportCol} = ${f.airport}
+        and t.international = ${f.international}
+        and t.test = false
+        and t.status <> 'in_progress'
+        and (${f.bags}::text is null or t.bags = ${f.bags}::text)
+        and (${f.party}::text is null or t.party = ${f.party}::text)
+        and (${f.transit}::text is null or t.transit = ${f.transit}::text)
+        and (${f.tsa_precheck}::boolean is null or t.tsa_precheck = ${f.tsa_precheck}::boolean)
+      group by m.trip_id, t.status
+      having count(*) >= 2
+    )
+    select
+      count(*)::int                                       as sample_n,
+      count(*) filter (where status = 'abandoned')::int   as incomplete_n,
+      count(*) filter (where status = 'complete')::int    as complete_n,
+      percentile_cont(0.50) within group (order by gap_s) as p50_s,
+      percentile_cont(0.90) within group (order by gap_s) as p90_s,
+      min(gap_s)                                          as min_s,
+      max(gap_s)                                          as max_s,
+      (array_agg(gap_s order by gap_s))[1:200]            as durations_s
+    from airport_window
   `;
   const r = rows[0];
   return {
