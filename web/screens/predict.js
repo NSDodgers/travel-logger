@@ -31,6 +31,7 @@ function computeFlightUtcMs(d) {
 let draft = null;
 let lastResult = null;
 let lastDrive = null;       // { duration_s, distance_m } from Mapbox; null if no origin or call failed
+let bufferMin = 0;          // user-chosen padding for food / lounge / breathing room (minutes)
 let inflightToken = 0;
 let cachedAddresses = null; // populated on first form mount
 
@@ -385,16 +386,25 @@ function renderResult(root, res, drive) {
 
   const airportSeg = res.segments?.airport;
   const liveAvailable = drive && airportSeg?.p90_s != null;
-  let heroOffsetS, heroSource;
+  let baseHeroOffsetS, heroSource;
   if (liveAvailable) {
-    heroOffsetS = drive.duration_s + airportSeg.p90_s;
+    baseHeroOffsetS = drive.duration_s + airportSeg.p90_s;
     heroSource = 'live';                    // live drive + history airport
   } else {
-    heroOffsetS = res.leave_by_offset_s;
+    baseHeroOffsetS = res.leave_by_offset_s;
     heroSource = 'history';                 // pure history fallback
   }
+  const baseComfortableOffsetS =
+    liveAvailable && airportSeg.p50_s != null ? drive.duration_s + airportSeg.p50_s :
+    res.kind === 'full' ? res.comfortable_offset_s :
+    null;
 
   const flightUtc = new Date(res.flight_utc).getTime();
+  // Buffer is layered on top of the model — same shift for hero +
+  // comfortable. Pure UI; doesn't change the prediction row written by
+  // the service.
+  const buffer_s = bufferMin * 60;
+  const heroOffsetS = baseHeroOffsetS != null ? baseHeroOffsetS + buffer_s : null;
   const heroDate  = heroOffsetS != null ? new Date(flightUtc + sign * heroOffsetS * 1000) : null;
   const heroTime  = heroDate ? formatLocal(heroDate, res.airport.tz) : '—';
   const heroDelta = heroOffsetS != null ? humanDuration(heroOffsetS) : '';
@@ -402,22 +412,14 @@ function renderResult(root, res, drive) {
   // Comfortable line: live drive + airport p50 (when both exist), else
   // historical full-trip p50 (when full sample), else hidden.
   let comfortable = '';
-  if (liveAvailable && airportSeg.p50_s != null) {
-    const offS = drive.duration_s + airportSeg.p50_s;
+  if (baseComfortableOffsetS != null) {
+    const offS = baseComfortableOffsetS + buffer_s;
     const cDate = new Date(flightUtc + sign * offS * 1000);
     comfortable = `
       <div class="predict-comfortable">
         <span class="predict-comfortable-label">Comfortable:</span>
-        <span class="predict-comfortable-time">${escapeHtml(formatLocal(cDate, res.airport.tz))}</span>
-        <span class="predict-comfortable-delta">(${escapeHtml(humanDuration(offS))} ${flightLabel})</span>
-      </div>
-    `;
-  } else if (res.kind === 'full' && res.comfortable_local) {
-    comfortable = `
-      <div class="predict-comfortable">
-        <span class="predict-comfortable-label">Comfortable:</span>
-        <span class="predict-comfortable-time">${escapeHtml(res.comfortable_local)}</span>
-        <span class="predict-comfortable-delta">(${escapeHtml(humanDuration(res.comfortable_offset_s))} ${flightLabel})</span>
+        <span class="predict-comfortable-time" data-comfortable-time>${escapeHtml(formatLocal(cDate, res.airport.tz))}</span>
+        <span class="predict-comfortable-delta" data-comfortable-delta>(${escapeHtml(humanDuration(offS))} ${flightLabel})</span>
       </div>
     `;
   }
@@ -438,12 +440,19 @@ function renderResult(root, res, drive) {
     ? (drive?.depart_at ? ' · typical traffic' : ' · live drive')
     : '';
 
+  // Buffer slider — sits between the answer and the breakdown. Pure UI;
+  // dragging the slider re-computes hero + comfortable in place via the
+  // bufferOffsetS layer. Pre-filled with the user's last-chosen value so
+  // they don't have to re-set it every prediction.
+  const buffer = bufferSliderHtml(bufferMin);
+
   slot.innerHTML = `
     <div class="predict-card predict-${res.kind}">
       <div class="predict-hero-label">${escapeHtml(heroLabel)}</div>
-      <div class="predict-hero-time">${escapeHtml(heroTime)}</div>
-      <div class="predict-hero-delta">${escapeHtml(heroDelta)} ${flightLabel}${heroSourceTag}</div>
+      <div class="predict-hero-time" data-hero-time>${escapeHtml(heroTime)}</div>
+      <div class="predict-hero-delta" data-hero-delta>${escapeHtml(heroDelta)} ${flightLabel}${heroSourceTag}</div>
       ${comfortable}
+      ${buffer}
       ${segmentsBlock}
       ${sparkline}
       ${breakdownHtml(res)}
@@ -456,6 +465,37 @@ function renderResult(root, res, drive) {
       ${matchedTripsHtml(res)}
     </div>
   `;
+
+  // Live buffer re-compute — slider input updates the hero + comfortable
+  // text in place without a service round-trip. We hold onto the base
+  // offsets in closure so the layer math is straightforward.
+  const slider = root.querySelector('#buffer-slider');
+  const valLabel = root.querySelector('#buffer-value');
+  const subLabel = root.querySelector('#buffer-sublabel');
+  if (slider) {
+    const apply = (mins) => {
+      bufferMin = mins;
+      const bs = mins * 60;
+      const heroS = baseHeroOffsetS != null ? baseHeroOffsetS + bs : null;
+      const compS = baseComfortableOffsetS != null ? baseComfortableOffsetS + bs : null;
+      if (heroS != null) {
+        const d = new Date(flightUtc + sign * heroS * 1000);
+        root.querySelector('[data-hero-time]').textContent = formatLocal(d, res.airport.tz);
+        root.querySelector('[data-hero-delta]').textContent =
+          `${humanDuration(heroS)} ${flightLabel}${heroSourceTag}`;
+      }
+      if (compS != null) {
+        const cd = new Date(flightUtc + sign * compS * 1000);
+        const ct = root.querySelector('[data-comfortable-time]');
+        const cd2 = root.querySelector('[data-comfortable-delta]');
+        if (ct) ct.textContent = formatLocal(cd, res.airport.tz);
+        if (cd2) cd2.textContent = `(${humanDuration(compS)} ${flightLabel})`;
+      }
+      valLabel.textContent = mins === 0 ? 'No buffer' : `${mins} min`;
+      subLabel.textContent = bufferSubLabel(mins);
+    };
+    slider.addEventListener('input', (e) => apply(Number(e.target.value)));
+  }
   // Past-trip rows: tap to view the timeline.
   root.querySelectorAll('.predict-trip-row').forEach((el) => {
     const open = () => {
@@ -571,6 +611,32 @@ function segmentsHtml(res, drive) {
       ${fallbackHint}
     </div>
   `;
+}
+
+// Buffer slider — adds padding for food / lounge / breathing room on
+// top of the model's leave-by anchor. Pure UI layer; doesn't change the
+// prediction row written by the service. Values 0-120 in 5-min steps.
+function bufferSliderHtml(currentMin) {
+  return `
+    <div class="predict-buffer">
+      <div class="predict-buffer-row">
+        <span class="predict-buffer-label">Buffer</span>
+        <span class="predict-buffer-value" id="buffer-value">${currentMin === 0 ? 'No buffer' : `${currentMin} min`}</span>
+      </div>
+      <input type="range" id="buffer-slider"
+             min="0" max="120" step="5" value="${currentMin}"
+             aria-label="Buffer time in minutes">
+      <p class="predict-buffer-sub" id="buffer-sublabel">${bufferSubLabel(currentMin)}</p>
+    </div>
+  `;
+}
+
+function bufferSubLabel(mins) {
+  if (mins === 0)  return 'For food / lounge / breathing room — drag to add padding.';
+  if (mins <= 15)  return 'Quick coffee or restroom stop.';
+  if (mins <= 35)  return 'Sit-down meal or short lounge.';
+  if (mins <= 60)  return 'Long meal or extended lounge.';
+  return 'Lounge session — leaving room to relax.';
 }
 
 // Format a UTC Date in the airport's tz the same way the predict service
