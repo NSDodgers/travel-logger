@@ -710,7 +710,16 @@ async function startTrip(d) {
     status: 'in_progress',
     source: 'app',
   };
-  api.post('/trips', tripBody, { intent: 'create_trip', trip_id: tripId });
+  // IMPORTANT: enqueue the trip BEFORE the milestone, and await the trip's
+  // enqueue first. api.post returns after the IDB write commits, so awaiting
+  // it ensures the trip entry's created_at is older than the milestone's
+  // when both land in the outbox. The drain loop reads head by created_at
+  // ASC, so the trip POST always attempts first. Without the await, the two
+  // enqueue tasks race through their own IDB transactions; whichever
+  // commits first gets the older effective ordering, and a milestone-first
+  // commit triggers FK violations until the trip eventually arrives — see
+  // /qa pre-M11 sweep, where dep_in_transit dead-lettered on its own trip.
+  await api.post('/trips', tripBody, { intent: 'create_trip', trip_id: tripId });
 
   const milestoneId = cryptoRandomId();
   const milestoneBody = {
@@ -721,7 +730,7 @@ async function startTrip(d) {
     client_seq: 1,
     void: false,
   };
-  api.post('/milestones', milestoneBody,
+  await api.post('/milestones', milestoneBody,
     { intent: 'log_milestone', trip_id: tripId, milestone_id: milestoneId });
 
   // Mount active state from our optimistic bodies — they're the source of
@@ -960,7 +969,9 @@ async function startArrivalTrip(d) {
     status: 'in_progress',
     source: 'app',
   };
-  api.post('/trips', tripBody, { intent: 'create_trip', trip_id: tripId });
+  // Same ordering rule as startTrip — await the trip's enqueue first so its
+  // created_at is older than the milestone's when both land in the outbox.
+  await api.post('/trips', tripBody, { intent: 'create_trip', trip_id: tripId });
 
   const milestoneId = cryptoRandomId();
   const milestoneBody = {
@@ -971,7 +982,7 @@ async function startArrivalTrip(d) {
     client_seq: 1,
     void: false,
   };
-  api.post('/milestones', milestoneBody,
+  await api.post('/milestones', milestoneBody,
     { intent: 'log_milestone', trip_id: tripId, milestone_id: milestoneId });
 
   state.trip = tripBody;
