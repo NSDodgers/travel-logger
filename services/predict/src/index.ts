@@ -155,6 +155,12 @@ async function handlePredict(req: PredictRequest): Promise<Response> {
   const relaxed = trip.relaxed;
   const filters = trip.filters;
 
+  // Pull the actual trip rows that matched the full-trip query (post-
+  // widening). Used by the frontend to render a "past trips" reminisce
+  // list at the bottom of the result card, with each row linking through
+  // to the trip's timeline.
+  const matched = await runMatchedTripsQuery(req.direction, filters);
+
   // Classify the result and compute the leave-by offset.
   let kind: "empty" | "low_n" | "full";
   let offset_s: number | null;
@@ -243,6 +249,7 @@ async function handlePredict(req: PredictRequest): Promise<Response> {
         relaxed_filters: airportSeg.relaxed,
       },
     },
+    matched_trips: matched,
     flight_local: `${req.flight_date_local}T${req.flight_time_local}`,
     flight_utc: flightUtc.toISOString(),
     leave_by_utc: leaveByUtc?.toISOString() ?? null,
@@ -466,6 +473,86 @@ async function runAirportSegmentQuery(direction: Direction, f: FilterSet): Promi
     max_s: r.max_s,
     durations_s: r.durations_s ?? [],
   };
+}
+
+// Matched trip rows for the "Past trips" reminisce list. Same filters as
+// the full-trip query, post-widening. Returns trip metadata plus the
+// computed first→last duration so the frontend can show "5h 22m" next to
+// the date without re-querying milestones. Capped at 50 rows — far more
+// than typical use (most queries match <20 trips after widening).
+async function runMatchedTripsQuery(direction: Direction, f: FilterSet) {
+  const airportCol = direction === "departure" ? sql`t.dep_airport` : sql`t.arr_airport`;
+  const rows = await sql<{
+    id: string;
+    sched_dep_date: string | null;
+    sched_dep_local: string | null;
+    sched_arr_date: string | null;
+    sched_arr_local: string | null;
+    dep_airport: string | null;
+    arr_airport: string | null;
+    bags: string;
+    party: string;
+    transit: string;
+    tsa_precheck: boolean;
+    international: boolean;
+    status: string;
+    source: string;
+    test: boolean;
+    duration_s: number;
+    n_milestones: number;
+  }[]>`
+    with matched as (
+      select
+        t.id as trip_id,
+        extract(epoch from (max(m.logged_at) - min(m.logged_at)))::float8 as duration_s,
+        count(*) as n_milestones
+      from public.trips t
+      join public.milestones m on m.trip_id = t.id
+      where m.void = false
+        and t.direction = ${direction}
+        and ${airportCol} = ${f.airport}
+        and t.international = ${f.international}
+        and t.test = false
+        and t.status <> 'in_progress'
+        and (${f.bags}::text is null or t.bags = ${f.bags}::text)
+        and (${f.party}::text is null or t.party = ${f.party}::text)
+        and (${f.transit}::text is null or t.transit = ${f.transit}::text)
+        and (${f.tsa_precheck}::boolean is null or t.tsa_precheck = ${f.tsa_precheck}::boolean)
+      group by t.id
+      having count(*) >= 2
+    )
+    select
+      t.id,
+      t.sched_dep_date, t.sched_dep_local::text, t.sched_arr_date, t.sched_arr_local::text,
+      t.dep_airport, t.arr_airport,
+      t.bags, t.party, t.transit, t.tsa_precheck, t.international,
+      t.status, t.source, t.test,
+      m.duration_s::int, m.n_milestones::int
+    from matched m
+    join public.trips t on t.id = m.trip_id
+    order by coalesce(t.sched_dep_date, t.sched_arr_date) desc nulls last,
+             t.created_at desc
+    limit 50
+  `;
+  return rows.map((r) => ({
+    id: r.id,
+    sched_dep_date: r.sched_dep_date,
+    sched_dep_local: r.sched_dep_local,
+    sched_arr_date: r.sched_arr_date,
+    sched_arr_local: r.sched_arr_local,
+    dep_airport: r.dep_airport,
+    arr_airport: r.arr_airport,
+    bags: r.bags,
+    party: r.party,
+    transit: r.transit,
+    tsa_precheck: r.tsa_precheck,
+    international: r.international,
+    status: r.status,
+    source: r.source,
+    test: r.test,
+    duration_s: r.duration_s,
+    n_milestones: r.n_milestones,
+  }));
 }
 
 // ── Validation ──────────────────────────────────────────────────────────

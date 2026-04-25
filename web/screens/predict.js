@@ -453,8 +453,21 @@ function renderResult(root, res, drive) {
         </button>
         <p class="hint">Opens the trip-start sheet with these values pre-filled.</p>
       </div>
+      ${matchedTripsHtml(res)}
     </div>
   `;
+  // Past-trip rows: tap to view the timeline.
+  root.querySelectorAll('.predict-trip-row').forEach((el) => {
+    const open = () => {
+      const id = el.dataset.id;
+      if (id) location.hash = `/history/${id}`;
+    };
+    el.addEventListener('click', open);
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+  });
+
   // Wire the handoff button. Clicking jumps to /log and opens the
   // trip-start sheet (or arrival-start sheet) with our form values
   // already populated. The user only fills in the bits Predict didn't
@@ -597,6 +610,75 @@ function breakdownHtml(res) {
       ${relaxed}
     </div>
   `;
+}
+
+// "Past trips" reminisce list — every trip that fed the prediction's
+// percentile math, sorted newest first, tappable to drill into the
+// timeline. Built to be skim-friendly: prominent date + duration with
+// the trip's vars beneath in muted text.
+function matchedTripsHtml(res) {
+  const trips = Array.isArray(res.matched_trips) ? res.matched_trips : [];
+  if (trips.length === 0) return '';
+
+  const rowHtml = (t) => {
+    const date = formatTripDate(t);
+    const route = `${t.dep_airport ?? '?'} → ${t.arr_airport ?? '?'}`;
+    const dur = humanDuration(t.duration_s);
+    const vars = [
+      prettyValue('bags', t.bags),
+      prettyValue('party', t.party),
+      prettyValue('transit', t.transit),
+      t.tsa_precheck ? 'PreCheck' : 'No PreCheck',
+      t.international ? 'Intl' : null,
+    ].filter(Boolean).join(' · ');
+    const badges = [
+      t.status === 'abandoned' ? '<span class="predict-trip-badge incomplete">incomplete</span>' : '',
+      t.test ? '<span class="predict-trip-badge test">test</span>' : '',
+      t.source === 'legacy' ? '<span class="predict-trip-badge legacy">legacy</span>' : '',
+    ].filter(Boolean).join('');
+    return `
+      <li class="predict-trip-row" data-id="${escapeHtml(t.id)}" role="button" tabindex="0">
+        <div class="predict-trip-top">
+          <span class="predict-trip-date">${escapeHtml(date)}</span>
+          <span class="predict-trip-route">${escapeHtml(route)}</span>
+          <span class="predict-trip-duration">${escapeHtml(dur)}</span>
+        </div>
+        <div class="predict-trip-meta">
+          <span class="predict-trip-vars">${escapeHtml(vars)}</span>
+          ${badges ? `<span class="predict-trip-badges">${badges}</span>` : ''}
+          <span class="predict-trip-milestones">${t.n_milestones} logged</span>
+        </div>
+      </li>
+    `;
+  };
+
+  return `
+    <div class="predict-trip-list">
+      <h3 class="predict-trip-list-title">Past trips that fed this prediction</h3>
+      <p class="predict-trip-list-sub">Sorted newest first · tap a row for the full milestone timeline.</p>
+      <ul class="predict-trip-rows">${trips.map(rowHtml).join('')}</ul>
+    </div>
+  `;
+}
+
+function formatTripDate(t) {
+  // Prefer scheduled date; fall back to whichever the trip carried.
+  const iso = t.sched_dep_date || t.sched_arr_date;
+  if (!iso) return '—';
+  // Strip the time portion (PostgREST returns dates as ISO with Z; iOS
+  // parses the bare YYYY-MM-DD reliably without).
+  const dateOnly = iso.slice(0, 10);
+  const [y, m, d] = dateOnly.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  // Build a noon-UTC date so tz boundaries don't bump it to the wrong day.
+  const date = new Date(Date.UTC(y, m - 1, d, 12));
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+    }).format(date);
+  } catch {
+    return dateOnly;
+  }
 }
 
 function formatApplied(f, relaxedKeys) {
