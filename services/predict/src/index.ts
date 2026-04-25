@@ -256,6 +256,7 @@ async function runQuery(direction: Direction, f: FilterSet): Promise<QueryResult
         and t.direction = ${direction}
         and ${airportCol} = ${f.airport}
         and t.international = ${f.international}
+        and t.test = false
         and t.status <> 'in_progress'
         and (${f.bags}::text is null or t.bags = ${f.bags}::text)
         and (${f.party}::text is null or t.party = ${f.party}::text)
