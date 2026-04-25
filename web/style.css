@@ -934,3 +934,114 @@ a { color: var(--accent); text-decoration: none; }
   color: var(--muted);
 }
 .auth-expired-card .btn { width: 100%; }
+
+/* ── Predict screen (M10) ──────────────────────────────────────────────── */
+
+.predict-screen .form { padding: 16px 16px 24px; gap: 14px; }
+.predict-screen #predict-form { padding-bottom: 8px; }
+
+.predict-result {
+  margin: 8px 16px 32px;
+}
+
+.predict-card {
+  padding: 20px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.predict-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.predict-empty p { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+
+.predict-hero-label {
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+.predict-hero-time {
+  margin-top: 4px;
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  text-align: center;
+  line-height: 1.05;
+}
+.predict-hero-delta {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.predict-comfortable {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  font-size: 14px;
+  color: var(--muted);
+  align-items: baseline;
+}
+.predict-comfortable-label { font-weight: 500; }
+.predict-comfortable-time {
+  font-family: var(--font-mono);
+  color: var(--text);
+  font-size: 18px;
+}
+.predict-comfortable-delta {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.predict-sparkline-wrap {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.predict-sparkline {
+  display: block;
+  width: 100%;
+  height: 60px;
+}
+.predict-sparkline-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.predict-breakdown {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.predict-breakdown strong { color: var(--text); }
+.predict-breakdown-key {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+  margin-right: 4px;
+}
+.predict-incomplete { color: var(--muted); }
+.predict-empty .predict-breakdown { border-top: none; padding-top: 0; }
+

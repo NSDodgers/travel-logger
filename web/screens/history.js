@@ -73,7 +73,7 @@ function rowHtml(trip) {
   const statusBadge = trip.status === 'in_progress'
     ? '<span class="history-badge in-progress">in progress</span>'
     : trip.status === 'abandoned'
-    ? '<span class="history-badge abandoned">abandoned</span>'
+    ? '<span class="history-badge abandoned">incomplete</span>'
     : '';
   return `
     <li class="history-row" data-id="${escapeAttr(trip.id)}" role="button" tabindex="0">
@@ -136,7 +136,7 @@ function renderTimeline(root, trip, milestones) {
           ${trip.international ? ' · International' : ''}
         </div>
         <div class="trip-header-meta">
-          Source: ${escapeHtml(trip.source)} · Status: ${escapeHtml(trip.status)}
+          Source: ${escapeHtml(trip.source)} · Status: ${escapeHtml(prettyStatus(trip.status))}
         </div>
       </div>
       ${milestones.length === 0
@@ -198,6 +198,11 @@ function humanDelta(fromIso, toIso) {
   const hours = Math.floor(mins / 60);
   const rem = mins % 60;
   return rem ? `${hours}h ${rem}m` : `${hours}h`;
+}
+
+function prettyStatus(status) {
+  // DB stores `abandoned`; Nick prefers "incomplete" in the UI (M10 decision).
+  return status === 'abandoned' ? 'incomplete' : status;
 }
 
 function formatVar(label, value) {
