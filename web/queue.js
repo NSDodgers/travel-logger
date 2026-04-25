@@ -167,11 +167,12 @@ export async function getQueuedFor(tripId) {
   }));
 }
 
-// Used by the log screen on mount: find a still-queued create_trip entry.
-// Returns null if none. This is how a reload mid-trip-creation finds the trip.
+// Used by the log screen on mount: find the MOST RECENT still-queued
+// create_trip entry. With M9 the user can have a queued dep trip and a
+// later queued arr trip; the active screen always wants the newest.
 export async function getQueuedActiveTrip() {
   return tx('readonly', (store) => new Promise((resolve, reject) => {
-    const req = store.index('by_created_at').openCursor(null, 'next');
+    const req = store.index('by_created_at').openCursor(null, 'prev');
     req.onsuccess = () => {
       const c = req.result;
       if (!c) return resolve(null);

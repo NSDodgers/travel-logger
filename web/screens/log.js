@@ -130,20 +130,25 @@ function renderFatal(root, err) {
 
 function renderEmpty(root) {
   root.innerHTML = `
-    <section class="log-screen">
-      <button class="log-hero" id="start-trip-btn">
+    <section class="log-screen log-screen-empty">
+      <button class="log-hero log-hero-dep" id="start-dep-btn">
         Dep: In Transit
-        <span class="log-hero-sub">Tap to start a new trip</span>
+        <span class="log-hero-sub">Tap to start a departure</span>
+      </button>
+      <button class="log-hero log-hero-arr" id="start-arr-btn">
+        Arr: Off Plane
+        <span class="log-hero-sub">Tap when you've just landed</span>
       </button>
     </section>
   `;
-  root.querySelector('#start-trip-btn').addEventListener('click', () => openTripStartSheet());
+  root.querySelector('#start-dep-btn').addEventListener('click', () => openDepStartSheet());
+  root.querySelector('#start-arr-btn').addEventListener('click', () => openArrivalStartSheet());
 }
 
 // ── Active state — log grid ────────────────────────────────────────────────
 
 function renderActive(root) {
-  const visibleKinds = visibleDepKinds();
+  const visibleKinds = visibleKindsForTrip();
   const loggedByKind = new Map(state.milestones.map((m) => [m.kind, m]));
   const nextKind = visibleKinds.find((k) => !loggedByKind.has(k.kind));
 
@@ -203,7 +208,7 @@ function tileHtml(kind, logged) {
               data-milestone-id="${escapeAttr(logged.id)}">
         <span class="log-tile-mark">✓ Done</span>
         <span class="log-tile-label">${escapeHtml(kind.label)}</span>
-        <span class="log-tile-time">${formatLocalTime(logged.logged_at, state.trip.dep_airport)}</span>
+        <span class="log-tile-time">${formatLocalTime(logged.logged_at, currentAirportIata())}</span>
       </button>
     `;
   }
@@ -216,12 +221,23 @@ function tileHtml(kind, logged) {
   `;
 }
 
-function visibleDepKinds() {
+// The airport the user is physically AT during the active state — used to
+// pick which tz to format milestone times in. For a departure trip, it's the
+// dep airport (where you're checking in); for arrival, the arr airport
+// (where you just landed).
+function currentAirportIata(trip = state.trip) {
+  if (!trip) return null;
+  return trip.direction === 'arrival' ? trip.arr_airport : trip.dep_airport;
+}
+
+function visibleKindsForTrip() {
+  const direction = state.trip.direction;
   const isCarry = state.trip.bags === 'carry_on';
   return state.kinds
-    .filter((k) => k.direction === 'departure')
+    .filter((k) => k.direction === direction)
     .filter((k) => isCarry ? k.shown_when_carry_on : true)
-    .filter((k) => k.kind !== 'dep_customs' || state.international)
+    // Customs tile (dep or arr) hides unless the trip flagged international.
+    .filter((k) => (k.kind !== 'dep_customs' && k.kind !== 'arr_customs') || state.international)
     .sort((a, b) => a.order_seq - b.order_seq);
 }
 
@@ -395,7 +411,8 @@ function attachLongPressHandlers(root) {
 function openEditVoidSheet(root, milestoneId, kind) {
   const ms = state.milestones.find((m) => m.id === milestoneId);
   if (!ms) return;
-  const tz = airportTzCache.get(state.trip.dep_airport) || 'UTC';
+  const iata = currentAirportIata();
+  const tz = airportTzCache.get(iata) || 'UTC';
   const localValue = utcIsoToLocalInputValue(ms.logged_at, tz);
 
   openSheet({
@@ -403,7 +420,7 @@ function openEditVoidSheet(root, milestoneId, kind) {
     body: `
       <div class="form" novalidate>
         <div class="form-row">
-          <label for="edit-time">Logged at (local to ${escapeHtml(state.trip.dep_airport ?? 'airport')})</label>
+          <label for="edit-time">Logged at (local to ${escapeHtml(iata ?? 'airport')})</label>
           <input id="edit-time" type="datetime-local" value="${escapeAttr(localValue)}">
           <p class="hint">Stored as UTC; displayed in the airport's local time.</p>
         </div>
@@ -431,7 +448,7 @@ function openEditVoidSheet(root, milestoneId, kind) {
 
 // ── Trip-start sheet ───────────────────────────────────────────────────────
 
-async function openTripStartSheet() {
+async function openDepStartSheet() {
   // Fetch sticky vars + address book in parallel before opening the sheet.
   const [addressesRes, lastTripRes] = await Promise.all([
     api.get('/addresses?archived=eq.false&order=updated_at.desc').catch(() => []),
@@ -716,6 +733,261 @@ function stickyBags(prev) {
   // Legacy trips were imported with bags='unknown' — never sticky that.
   if (prev === 'checked' || prev === 'carry_on') return prev;
   return 'carry_on';
+}
+
+// ── Arrival start sheet ────────────────────────────────────────────────────
+//
+// Per Flow C: minimal sheet — destination address required; arrival airport
+// auto-fills from the most-recent completed *departure* trip's arr_airport
+// (with a "Change" affordance); everything else (bags/party/transit/tsa/
+// international) is sticky from the same dep trip.
+async function openArrivalStartSheet() {
+  const [addressesRes, lastDepRes] = await Promise.all([
+    api.get('/addresses?archived=eq.false&order=updated_at.desc').catch(() => []),
+    api.get('/trips?direction=eq.departure&status=eq.complete&order=created_at.desc&limit=1').catch(() => []),
+  ]);
+  state.addresses = Array.isArray(addressesRes) ? addressesRes : [];
+  const lastDep = (Array.isArray(lastDepRes) && lastDepRes[0]) || null;
+
+  // Auto-fill from last departure trip; user can override the airport in-sheet.
+  let depAirport = null, arrAirport = null;
+  if (lastDep?.arr_airport) {
+    arrAirport = await fetchAirport(lastDep.arr_airport);
+    if (arrAirport?.iata && arrAirport?.tz) airportTzCache.set(arrAirport.iata, arrAirport.tz);
+  }
+  if (lastDep?.dep_airport) {
+    depAirport = await fetchAirport(lastDep.dep_airport);
+  }
+
+  const draft = {
+    address_id: state.addresses[0]?.id || '',  // user picks destination
+    dep_airport: depAirport,        // carried forward silently
+    arr_airport: arrAirport,        // editable
+    bags:           stickyBags(lastDep?.bags),
+    party:          lastDep?.party  || 'solo',
+    transit:        lastDep?.transit || 'car',
+    tsa_precheck:   !!lastDep?.tsa_precheck,
+    international:  !!lastDep?.international,
+  };
+
+  openSheet({
+    title: 'Start arrival',
+    body: `
+      <form class="form" novalidate>
+        <div class="form-row">
+          <label for="dest-select">Destination address</label>
+          <select id="dest-select" class="form-row" style="padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);font-size:16px">
+            ${state.addresses.length ? '' : '<option value="">— No saved addresses —</option>'}
+            ${state.addresses.map((a) => `
+              <option value="${escapeAttr(a.id)}" ${a.id === draft.address_id ? 'selected' : ''}>
+                ${escapeHtml(a.label)}
+              </option>
+            `).join('')}
+          </select>
+          <p class="hint">
+            <a href="#/addresses/new" id="add-addr-link">+ Add a new address</a>
+          </p>
+        </div>
+
+        <div class="form-row">
+          <label>Arrival airport</label>
+          <div id="arr-airport-display"></div>
+        </div>
+        <div id="arr-airport-slot" hidden></div>
+
+        <div class="form-row">
+          <label>Bags</label>
+          <div class="toggle-group" data-field="bags">
+            <button type="button" data-value="carry_on">Carry-on</button>
+            <button type="button" data-value="checked">Checked</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Party</label>
+          <div class="toggle-group" data-field="party">
+            <button type="button" data-value="solo">Solo</button>
+            <button type="button" data-value="group_without_kids">No kids</button>
+            <button type="button" data-value="group_with_kids">With kids</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Transit</label>
+          <div class="toggle-group" data-field="transit">
+            <button type="button" data-value="car">Car</button>
+            <button type="button" data-value="public">Public</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>TSA PreCheck</label>
+          <div class="toggle-group" data-field="tsa_precheck">
+            <button type="button" data-value="false">No</button>
+            <button type="button" data-value="true">Yes</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>International / customs</label>
+          <div class="toggle-group" data-field="international">
+            <button type="button" data-value="false">No</button>
+            <button type="button" data-value="true">Yes</button>
+          </div>
+          <p class="hint">Yes shows the Customs tile in the active grid.</p>
+        </div>
+
+        <div id="arr-error" class="hint" style="color:var(--error)" hidden></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="arr-cancel-btn">Cancel</button>
+          <button type="button" class="btn btn-primary" id="arr-start-btn">Start arrival</button>
+        </div>
+      </form>
+    `,
+    onMount: (sheetRoot, close) => {
+      const errEl = sheetRoot.querySelector('#arr-error');
+      const startBtn = sheetRoot.querySelector('#arr-start-btn');
+      const arrAirportSlot = sheetRoot.querySelector('#arr-airport-slot');
+      const arrDisplay = sheetRoot.querySelector('#arr-airport-display');
+
+      // Toggle groups → draft state.
+      sheetRoot.querySelectorAll('.toggle-group').forEach((g) => {
+        const field = g.dataset.field;
+        const current = String(draft[field]);
+        g.querySelectorAll('button').forEach((b) => {
+          if (b.dataset.value === current) b.setAttribute('aria-pressed', 'true');
+          b.addEventListener('click', () => {
+            g.querySelectorAll('button').forEach((bb) => bb.setAttribute('aria-pressed', 'false'));
+            b.setAttribute('aria-pressed', 'true');
+            draft[field] = field === 'tsa_precheck' || field === 'international'
+              ? b.dataset.value === 'true'
+              : b.dataset.value;
+          });
+        });
+      });
+
+      // Destination select.
+      const destSel = sheetRoot.querySelector('#dest-select');
+      destSel.addEventListener('change', () => { draft.address_id = destSel.value || null; });
+      sheetRoot.querySelector('#add-addr-link').addEventListener('click', close);
+
+      // Arrival airport: render auto-filled pill + Change affordance.
+      function renderArrAirportDisplay() {
+        if (draft.arr_airport) {
+          arrDisplay.innerHTML = `
+            <div class="iata-pill">
+              <strong>${escapeHtml(draft.arr_airport.iata)}</strong>
+              <span class="iata-pill-name">${escapeHtml(draft.arr_airport.name || draft.arr_airport.city || '')}</span>
+              <button type="button" class="btn-link" id="change-arr-btn" style="padding:0 8px;font-size:14px">Change</button>
+            </div>
+          `;
+          arrDisplay.querySelector('#change-arr-btn').addEventListener('click', () => {
+            arrDisplay.innerHTML = '<p class="hint">Pick the airport you just landed at:</p>';
+            arrAirportSlot.hidden = false;
+            mountAirportPicker(arrAirportSlot, {
+              id: 'arr-airport',
+              label: 'Arrival airport',
+              placeholder: 'IATA, city, or name',
+              onChange: (a) => {
+                draft.arr_airport = a;
+                if (a?.iata && a?.tz) airportTzCache.set(a.iata, a.tz);
+                renderArrAirportDisplay();
+                arrAirportSlot.innerHTML = '';
+                arrAirportSlot.hidden = true;
+              },
+            });
+          });
+        } else {
+          arrDisplay.innerHTML = '';
+          arrAirportSlot.hidden = false;
+          mountAirportPicker(arrAirportSlot, {
+            id: 'arr-airport',
+            label: 'Arrival airport',
+            placeholder: 'IATA, city, or name',
+            onChange: (a) => {
+              draft.arr_airport = a;
+              if (a?.iata && a?.tz) airportTzCache.set(a.iata, a.tz);
+              renderArrAirportDisplay();
+              arrAirportSlot.innerHTML = '';
+              arrAirportSlot.hidden = true;
+            },
+          });
+        }
+      }
+      renderArrAirportDisplay();
+
+      sheetRoot.querySelector('#arr-cancel-btn').addEventListener('click', close);
+
+      startBtn.addEventListener('click', async () => {
+        if (!draft.address_id) { errEl.hidden = false; errEl.textContent = 'Pick or add a destination address.'; return; }
+        if (!draft.arr_airport) { errEl.hidden = false; errEl.textContent = 'Pick the airport you just landed at.'; return; }
+        errEl.hidden = true;
+        startBtn.disabled = true;
+        startBtn.textContent = 'Starting…';
+        try {
+          await startArrivalTrip(draft);
+          close();
+        } catch (err) {
+          console.error(err);
+          errEl.hidden = false;
+          errEl.textContent = err.message;
+          startBtn.disabled = false;
+          startBtn.textContent = 'Start arrival';
+        }
+      });
+    },
+  });
+}
+
+async function startArrivalTrip(d) {
+  const tripId = cryptoRandomId();
+  const tripBody = {
+    id: tripId,
+    direction: 'arrival',
+    address_id: d.address_id,
+    // dep_airport carries the originating airport from the corresponding dep
+    // trip if we found one — matches the legacy convention. arr_airport is
+    // where the user is now.
+    dep_airport: d.dep_airport?.iata ?? d.arr_airport.iata,
+    arr_airport: d.arr_airport.iata,
+    bags: d.bags,
+    party: d.party,
+    transit: d.transit,
+    tsa_precheck: d.tsa_precheck,
+    international: d.international,
+    status: 'in_progress',
+    source: 'app',
+  };
+  api.post('/trips', tripBody, { intent: 'create_trip', trip_id: tripId });
+
+  const milestoneId = cryptoRandomId();
+  const milestoneBody = {
+    id: milestoneId,
+    trip_id: tripId,
+    kind: 'arr_off_plane',
+    logged_at: new Date().toISOString(),
+    client_seq: 1,
+    void: false,
+  };
+  api.post('/milestones', milestoneBody,
+    { intent: 'log_milestone', trip_id: tripId, milestone_id: milestoneId });
+
+  state.trip = tripBody;
+  state.milestones = [milestoneBody];
+  state.international = d.international;
+  haptic(15);
+  window.__toast?.('Arrival started · Off Plane logged', { level: 'success' });
+  const screenEl = document.getElementById('screen');
+  if (screenEl) renderScreen(screenEl);
+}
+
+// One-shot airport lookup for sheet pre-fill (autocomplete UI handles the
+// interactive case). PostgREST returns an array; we want at most one row.
+async function fetchAirport(iata) {
+  if (!iata) return null;
+  try {
+    const rows = await api.get(`/airports?iata=eq.${encodeURIComponent(iata)}&select=iata,name,city,tz&limit=1`);
+    return Array.isArray(rows) ? rows[0] : null;
+  } catch (err) {
+    console.warn('fetchAirport failed:', err);
+    return null;
+  }
 }
 
 // ── Sheet primitive ────────────────────────────────────────────────────────
