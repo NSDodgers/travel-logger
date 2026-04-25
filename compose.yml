@@ -16,11 +16,21 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8090:80"
+    # Startup shim reads /run/secrets/mapbox_token and writes /gen/config.js
+    # before exec'ing caddy. See ops/caddy-entrypoint.sh.
+    entrypoint: ["/ops/caddy-entrypoint.sh"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./ops:/ops:ro
       - ./web:/srv:ro
       - caddy_data:/data
       - caddy_config:/config
+    tmpfs:
+      # /gen holds the generated config.js; tmpfs keeps it out of any
+      # persistent volume and regenerated every restart.
+      - /gen:mode=0755
+    secrets:
+      - mapbox_token
     depends_on:
       - authelia
       - postgrest
@@ -215,6 +225,8 @@ secrets:
     file: ./secrets/authelia_storage.txt
   authelia_reset_jwt:
     file: ./secrets/authelia_reset_jwt.txt
+  mapbox_token:
+    file: ./secrets/mapbox_token.txt
   # Uncomment in M12 with walg:
   # b2_key_id:
   #   file: ./secrets/b2_key_id.txt

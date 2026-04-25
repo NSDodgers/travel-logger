@@ -35,6 +35,7 @@
 	@auth path /auth /auth/*
 	@api_predict path /api/predict /api/predict/*
 	@api path /api /api/*
+	@config path /config.js
 
 	# @protected matches everything EXCEPT the Authelia portal path itself
 	# (the portal has to be reachable unauthenticated so the user can log in).
@@ -53,6 +54,17 @@
 	# ─── Route: PostgREST ───────────────────────────────────────────────
 	handle @api {
 		reverse_proxy postgrest:3000
+	}
+
+	# ─── Route: generated runtime config (Mapbox token) ─────────────────
+	# ops/caddy-entrypoint.sh writes /gen/config.js at container start from
+	# the mounted mapbox_token secret. Served as a one-off file, not a dir.
+	handle @config {
+		root * /gen
+		file_server {
+			pass_thru
+		}
+		header Cache-Control "no-store"
 	}
 
 	# ─── Route: static PWA ──────────────────────────────────────────────
