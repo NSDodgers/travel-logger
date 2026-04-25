@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Travel Logger">
-  <rect width="512" height="512" rx="96" fill="#000000"/>
-  <path d="M128 176h256v40h-108v176h-40V216H128z" fill="#FF9F0A"/>
+  <title>Travel Logger</title>
+  <rect width="512" height="512" fill="#000000"/>
+  <path fill="#FF9F0A" d="M256 96 C248 96 244 116 244 140 L244 220 L96 296 L96 320 L244 268 L244 348 L188 376 L188 392 L244 372 L252 400 L256 416 L260 400 L268 372 L324 392 L324 376 L268 348 L268 268 L416 320 L416 296 L268 220 L268 140 C268 116 264 96 256 96 Z"/>
 </svg>
