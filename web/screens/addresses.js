@@ -107,27 +107,75 @@ function renderError(root, err) {
 // ── Add ────────────────────────────────────────────────────────────────────
 
 export function addressAddScreen(root) {
+  mountAddressForm(root, { mode: 'add', existing: null });
+  return { title: 'New Address', tab: 'log', showBack: true, primary: null };
+}
+
+// ── Edit ───────────────────────────────────────────────────────────────────
+
+export async function addressEditScreen(root, params) {
+  root.innerHTML = `<section class="screen"><div class="loading">Loading address…</div></section>`;
+  let existing;
+  try {
+    const res = await api.get(`/addresses?id=eq.${encodeURIComponent(params.id)}`);
+    existing = Array.isArray(res) ? res[0] : null;
+    if (!existing) throw new Error('Not found');
+  } catch (err) {
+    root.innerHTML = `
+      <section class="screen">
+        <div class="placeholder">
+          <h2>Couldn't load address</h2>
+          <p>${escapeHtml(err instanceof ApiError ? `${err.status} ${err.statusText}` : err.message)}</p>
+          <button class="btn btn-secondary" onclick="location.hash='/addresses'" style="margin-top:16px">Back to list</button>
+        </div>
+      </section>
+    `;
+    return { title: 'Edit Address', tab: 'log', showBack: true, primary: null };
+  }
+  mountAddressForm(root, { mode: 'edit', existing });
+  return { title: 'Edit Address', tab: 'log', showBack: true, primary: null };
+}
+
+// ── Shared form mount (add + edit) ─────────────────────────────────────────
+
+function mountAddressForm(root, { mode, existing }) {
+  const initialPicked = existing
+    ? { mapbox_id: existing.mapbox_id, formatted: existing.formatted,
+        lat: existing.lat, lng: existing.lng }
+    : null;
+
   const state = {
     sessionToken: newSessionToken(),
-    picked: null,       // { mapbox_id, formatted, lat, lng }
+    picked: initialPicked,
     suggestions: [],
     suggestLoading: false,
     saving: false,
-    error: null,
   };
 
-  root.innerHTML = formTemplate({ heading: 'New address' });
-  const labelEl   = root.querySelector('#addr-label');
-  const searchEl  = root.querySelector('#addr-search');
-  const suggestEl = root.querySelector('#suggest-list');
-  const pinEl     = root.querySelector('#pin-slot');
-  const saveBtn   = root.querySelector('#save-btn');
-  const cancelBtn = root.querySelector('#cancel-btn');
-  const errorEl   = root.querySelector('#error-slot');
+  root.innerHTML = formTemplate({ mode, existing });
+  const labelEl     = root.querySelector('#addr-label');
+  const searchEl    = root.querySelector('#addr-search');
+  const suggestEl   = root.querySelector('#suggest-list');
+  const pinEl       = root.querySelector('#pin-slot');
+  const saveBtn     = root.querySelector('#save-btn');
+  const cancelBtn   = root.querySelector('#cancel-btn');
+  const archiveBtn  = root.querySelector('#archive-btn');
+  const errorEl     = root.querySelector('#error-slot');
+
+  if (existing) {
+    labelEl.value = existing.label;
+    searchEl.value = existing.formatted;
+    renderPin(pinEl, initialPicked);
+  }
 
   const updateSaveEnabled = () => {
-    saveBtn.disabled = state.saving || !labelEl.value.trim() || !state.picked;
+    const dirty = mode === 'add' || labelEl.value.trim() !== existing.label
+      || state.picked?.mapbox_id !== existing.mapbox_id
+      || state.picked?.lat !== existing.lat
+      || state.picked?.lng !== existing.lng;
+    saveBtn.disabled = state.saving || !labelEl.value.trim() || !state.picked || !dirty;
   };
+  updateSaveEnabled();
 
   labelEl.addEventListener('input', updateSaveEnabled);
 
@@ -149,8 +197,7 @@ export function addressAddScreen(root) {
   }, 220);
 
   searchEl.addEventListener('input', () => {
-    // Typing invalidates a previously-picked pin.
-    if (state.picked) {
+    if (state.picked && searchEl.value !== state.picked.formatted) {
       state.picked = null;
       renderPin(pinEl, null);
       updateSaveEnabled();
@@ -164,12 +211,10 @@ export function addressAddScreen(root) {
   suggestEl.addEventListener('click', async (e) => {
     const li = e.target.closest('li[data-mapbox-id]');
     if (!li) return;
-    const mapboxId = li.dataset.mapboxId;
     try {
       saveBtn.disabled = true;
-      state.picked = await retrieve(mapboxId, state.sessionToken);
+      state.picked = await retrieve(li.dataset.mapboxId, state.sessionToken);
       searchEl.value = state.picked.formatted;
-      // New session token after retrieve — that billing session is now closed.
       state.sessionToken = newSessionToken();
       state.suggestions = [];
       renderSuggestions(suggestEl, state);
@@ -198,8 +243,17 @@ export function addressAddScreen(root) {
         lng: state.picked.lng,
         mapbox_id: state.picked.mapbox_id,
       };
-      await api.post('/addresses', body);
-      window.__toast?.('Address saved', { level: 'success' });
+      if (mode === 'add') {
+        await api.post('/addresses', body);
+        window.__toast?.('Address saved', { level: 'success' });
+      } else {
+        // Bump updated_at client-side so the list re-sorts — no trigger yet.
+        await api.patch(
+          `/addresses?id=eq.${encodeURIComponent(existing.id)}`,
+          { ...body, updated_at: new Date().toISOString() },
+        );
+        window.__toast?.('Address updated', { level: 'success' });
+      }
       location.hash = '/addresses';
     } catch (err) {
       console.error(err);
@@ -210,26 +264,41 @@ export function addressAddScreen(root) {
     }
   });
 
-  return { title: 'New Address', tab: 'log', showBack: true, primary: null };
-}
-
-export function addressEditScreen(root, params) {
-  root.innerHTML = `
-    <section class="screen">
-      <div class="loading">Edit-address form lands in the next commit (id=${params.id}).</div>
-    </section>
-  `;
-  return { title: 'Edit Address', tab: 'log', showBack: true, primary: null };
+  if (archiveBtn) {
+    archiveBtn.addEventListener('click', async () => {
+      const nextArchived = !existing.archived;
+      archiveBtn.disabled = true;
+      setError(errorEl, null);
+      try {
+        await api.patch(
+          `/addresses?id=eq.${encodeURIComponent(existing.id)}`,
+          { archived: nextArchived, updated_at: new Date().toISOString() },
+        );
+        window.__toast?.(nextArchived ? 'Address archived' : 'Address restored', { level: 'success' });
+        location.hash = '/addresses';
+      } catch (err) {
+        console.error(err);
+        archiveBtn.disabled = false;
+        const msg = err instanceof ApiError ? `${err.status}: ${err.body || err.statusText}` : err.message;
+        setError(errorEl, `Archive failed — ${msg}`);
+      }
+    });
+  }
 }
 
 // ── Shared form helpers ────────────────────────────────────────────────────
 
-function formTemplate({ heading }) {
+function formTemplate({ mode, existing }) {
+  const archiveBtn = mode === 'edit'
+    ? `<button type="button" class="btn btn-danger" id="archive-btn" style="margin-top:16px">
+         ${existing.archived ? 'Unarchive' : 'Archive'}
+       </button>`
+    : '';
   return `
     <section class="screen">
       <form class="form" novalidate>
         <div class="form-row">
-          <label for="addr-label">${heading}</label>
+          <label for="addr-label">Label</label>
           <input id="addr-label" type="text" autocomplete="off"
                  placeholder="Home, Mom's, Hotel, …" maxlength="80">
           <p class="hint">A short name you'll recognize in the trip picker.</p>
@@ -251,6 +320,7 @@ function formTemplate({ heading }) {
           <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
           <button type="button" class="btn btn-primary" id="save-btn" disabled>Save</button>
         </div>
+        ${archiveBtn}
       </form>
     </section>
   `;
