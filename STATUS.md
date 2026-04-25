@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-04-24 after M4. Update this file at the end of each milestone._
+_Last updated: 2026-04-24 after M5. Update this file at the end of each milestone._
 
 ## Milestones
 
@@ -10,8 +10,9 @@ _Last updated: 2026-04-24 after M4. Update this file at the end of each mileston
 | M2 | ✅ | Docker stack + Authelia (all 6 containers healthy) |
 | M3 | ✅ | `travel.myhometech.app` live, login works on iPhone |
 | M4 | ✅ | 5,515 airports seeded |
-| M5 | ✅ | Historical import: 231 trips + 536 milestones loaded (2017-08 → 2026-04). See `docs/M5_INVENTORY.md` + `docs/M5_QUIZ*.md`; re-run via `./scripts/load-legacy.sh` |
-| M6–M13 | planned | See `implementation_plan.md` §8 |
+| M5 | ✅ | Historical import: 231 trips + 536 milestones loaded (2017-08 → 2026-04). 14 addresses, 8 sources reconciled. See `docs/M5_INVENTORY.md` + `docs/M5_QUIZ*.md`; re-run via `./scripts/load-legacy.sh` |
+| **M6** | **⏳ next** | Address book + Mapbox. PWA shell scaffold; Mapbox Search JS Core autocomplete; address add/edit/archive. See `docs/M6_BRIEF.md` |
+| M7–M13 | planned | See `implementation_plan.md` §8 |
 
 ## Currently running on Mac Studio
 
@@ -43,6 +44,8 @@ Local URL: **<http://127.0.0.1:8090>** (bypasses Cloudflare, still gated by Auth
 | Enter Postgres | `docker compose exec postgres psql -U postgres -d travel` |
 | Re-seed airports | `./scripts/load-airports.sh` |
 | Re-generate airports seed | `bun run db/seeds/generate-airports.ts` |
+| Re-load legacy data | `./scripts/load-legacy.sh` (idempotent — wipes + reloads `source='legacy'` rows) |
+| Re-generate legacy SQL only | `bun run db/seeds/import-legacy.ts` |
 
 ## Secrets inventory (on-disk, never in git)
 
@@ -75,6 +78,13 @@ Every file in `./secrets/` is `chmod 0600`, gitignored. Regenerated via `./scrip
 | `610107a` | Predict healthcheck uses 127.0.0.1 (Alpine IPv6 localhost issue) |
 | `826a8fe` | Authelia `/auth` path prefix fix (white-screen bug) |
 | `c494e4e` | M4 airport dataset (5,515 rows) |
+| `cedd470` | M5 docs + 14-address registry |
+| `0cc4256` | M5 schema migration (party enum 3-way + customs kinds) |
+| `f1c4895` | M5 narrative source — 59 resolved trip entries |
+| `4c25dfe` | M5 parser — narrative + CSV → trip rows + SQL |
+| `52245d6` | M5 loader script |
+| `e6c4cb5` | M5 milestones_history FK fix (deferrable for bulk loads) |
+| `2d62c20` | M5 marked complete |
 
 Diff against `main` (what changed since last push): `git log --oneline origin/main..HEAD` — should be empty if everything's pushed.
 
@@ -82,8 +92,15 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 
 - `bun-predict` skeleton only has `/api/predict/health`. `POST /api/predict` returns 501. Real percentile + widening math lands in M10.
 - `walg` container is stubbed in `compose.yml` (commented out). Gets activated in M12.
-- `web/index.html` is a placeholder. Real PWA shell lands in M7.
+- `web/index.html` is a placeholder. PWA shell + first feature (address book) lands in M6; trip-logging UI in M7.
 - No tests exist yet. Plan's §4 test diagram needs to start getting filled in alongside M7–M10.
+
+## Schema additions from M5
+
+- `trips.party` enum expanded from `solo|family` → `solo|group_with_kids|group_without_kids`. Existing app code that hardcoded `family` should migrate to `group_with_kids`.
+- New milestone kinds: `dep_customs` (departure-side, e.g. YYZ US preclearance) and `arr_customs` (arrival-side, between off-plane and bags). Order_seq for existing arrival kinds bumped by 1.
+- `milestones_history.milestone_id` FK is now `deferrable initially immediate` so bulk loaders can use `set constraints deferred`.
+- 14 legacy addresses live in `public.addresses` with labels prefixed `legacy:` (e.g. `legacy:home_192nd`). The label prefix is a wipe marker — `delete from public.addresses where label like 'legacy:%'` cleans them up before re-loading.
 
 ## External accounts / dashboards
 
@@ -97,7 +114,8 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 ## If Claude is starting a fresh session
 
 1. Read this file first.
-2. Read `implementation_plan.md` — the canonical plan.
+2. Read `implementation_plan.md` — the canonical plan (M6 details in §8 + §10 UI spec).
 3. Read `CLAUDE.md` — project brief + skill routing.
 4. Memory at `~/.claude/projects/-Users-nicksolyom-Code-travel-logger/memory/MEMORY.md` has cross-session context (decisions, gotchas).
-5. For M5 specifically, also read `docs/M5_BRIEF.md`.
+5. For M6 specifically, read `docs/M6_BRIEF.md`.
+6. M5 reference (read only if M5 context is needed): `docs/M5_INVENTORY.md`, `docs/M5_QUIZ.md`, `docs/M5_QUIZ_2.md`.
