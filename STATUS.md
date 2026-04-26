@@ -137,7 +137,7 @@ Every file in `./secrets/` is `chmod 0600`, gitignored. Regenerated via `./scrip
 | `dbdb3fe` | predict — past-trips list (every match, sortable, tappable) |
 | `76f7e32` | predict — buffer slider for food / lounge / breathing room |
 | `83b247c` | scheduled boarding — predict anchor + trip-start sheet field + migration 009 + handoff |
-| _next_ | buffer-to-boarding — per-trip in history + aggregate p50/p90 in predict (security → boarding, inferred when boarding null) |
+| `a694e4f` | buffer-to-boarding — per-trip in history + aggregate p50/p90 in predict (security → boarding, inferred when boarding null) |
 
 Diff against `main` (what changed since last push): `git log --oneline origin/main..HEAD` — should be empty if everything's pushed.
 
