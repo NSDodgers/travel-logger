@@ -136,7 +136,7 @@ Every file in `./secrets/` is `chmod 0600`, gitignored. Regenerated via `./scrip
 | `ae3bdfd` | predict — Origin hint copy uses flight time, not "today" |
 | `dbdb3fe` | predict — past-trips list (every match, sortable, tappable) |
 | `76f7e32` | predict — buffer slider for food / lounge / breathing room |
-| _next_ | scheduled boarding — predict anchor + trip-start sheet field + migration 009 + handoff |
+| `83b247c` | scheduled boarding — predict anchor + trip-start sheet field + migration 009 + handoff |
 
 Diff against `main` (what changed since last push): `git log --oneline origin/main..HEAD` — should be empty if everything's pushed.
 
