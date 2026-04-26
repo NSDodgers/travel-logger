@@ -491,6 +491,7 @@ async function openDepStartSheet(handoff = null) {
     arr_airport: null,
     sched_dep_date: handoff?.sched_dep_date ?? '',
     sched_dep_time: handoff?.sched_dep_time ?? '',
+    sched_dep_board_time: handoff?.sched_dep_board_time ?? '',
     sched_arr_date: '',
     sched_arr_time: '',
     bags: initialBags,
@@ -529,6 +530,11 @@ async function openDepStartSheet(handoff = null) {
             <input id="sched-dep-date" type="date">
             <input id="sched-dep-time" type="time">
           </div>
+        </div>
+        <div class="form-row">
+          <label for="sched-dep-board-time">Scheduled boarding (local) — optional</label>
+          <input id="sched-dep-board-time" type="time">
+          <p class="hint">Date matches the flight; red-eyes (boarding after takeoff time) infer the previous day.</p>
         </div>
         <div class="form-row">
           <label>Scheduled arrival (local)</label>
@@ -659,6 +665,11 @@ async function openDepStartSheet(handoff = null) {
         });
       });
 
+      // Optional boarding time — separate from the depDate/depTime pair.
+      const boardEl = sheetRoot.querySelector('#sched-dep-board-time');
+      if (draft.sched_dep_board_time) boardEl.value = draft.sched_dep_board_time;
+      boardEl.addEventListener('change', () => { draft.sched_dep_board_time = boardEl.value; });
+
       // DST validation. Shows a warning banner under the times.
       const dstSlot = sheetRoot.querySelector('#dst-slot');
       function revalidateDst() {
@@ -726,6 +737,7 @@ async function startTrip(d) {
     dep_airport: d.dep_airport.iata,
     arr_airport: d.arr_airport.iata,
     sched_dep_local: d.sched_dep_time,
+    sched_dep_board_local: d.sched_dep_board_time || null,
     sched_dep_date: d.sched_dep_date,
     sched_arr_local: d.sched_arr_time,
     sched_arr_date: d.sched_arr_date,

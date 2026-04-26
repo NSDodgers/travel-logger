@@ -136,6 +136,7 @@ Every file in `./secrets/` is `chmod 0600`, gitignored. Regenerated via `./scrip
 | `ae3bdfd` | predict — Origin hint copy uses flight time, not "today" |
 | `dbdb3fe` | predict — past-trips list (every match, sortable, tappable) |
 | `76f7e32` | predict — buffer slider for food / lounge / breathing room |
+| _next_ | scheduled boarding — predict anchor + trip-start sheet field + migration 009 + handoff |
 
 Diff against `main` (what changed since last push): `git log --oneline origin/main..HEAD` — should be empty if everything's pushed.
 
@@ -181,6 +182,10 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 ## Schema changes in M14
 
 - Migration `008-airports-lat-lng.sql` adds `lat`/`lng` (`double precision`, nullable) to `public.airports` and re-creates `api.airports` (drop+recreate — `replace view` can't reorder columns). OpenFlights already carries these in `airports.dat` cols 6/7; the M4 generator dropped them. The M14 Predict form needs coords on both ends of the route to call Mapbox Directions, so the seed regenerator (`db/seeds/generate-airports.ts`) was updated and `04-airports-seed.sql` re-emitted with coords for all 5,515 rows. The columns are nullable because a small handful of OpenFlights rows lack coords; the frontend handles missing coords by skipping the live-drive call gracefully.
+
+## Schema changes for scheduled boarding
+
+- Migration `009-trips-sched-dep-board-local.sql` adds nullable `sched_dep_board_local` (`time without time zone`) to `public.trips` and re-creates `api.trips` so the column slots next to `sched_dep_local`. Stored as TIME (not TIMESTAMP) to mirror `sched_dep_local`; the boarding date is implicitly `sched_dep_date` with prev-day inferred client-side for red-eyes (boarding > flight on same date → boarding is the previous day). Predict screen anchors "Leave by" on boarding when set (pure UI layer — does not change the persisted prediction row); the dep trip-start sheet has an optional boarding input; Predict→Trip handoff carries `sched_dep_board_time` so the value flows from prediction into the logged trip. Legacy and pre-migration trips carry null — no backfill.
 
 ## External accounts / dashboards
 

@@ -27,6 +27,27 @@ function computeFlightUtcMs(d) {
   return Number.isFinite(ms) ? ms : null;
 }
 
+// Boarding time = optional anchor for departures. When provided, "Leave by"
+// counts back from boarding instead of takeoff. If boarding > flight (e.g.
+// red-eye: flight 00:30, boarding 23:50), boarding is on the previous day.
+function computeBoardingUtcMs(d) {
+  if (!d.flight_board_time || !d.flight_date || !d.airport?.tz) return null;
+  const flightMs = computeFlightUtcMs(d);
+  if (flightMs == null) return null;
+  let iso = localInputValueToUtcIso(`${d.flight_date}T${d.flight_board_time}`, d.airport.tz);
+  let ms = new Date(iso).getTime();
+  if (Number.isFinite(ms) && ms > flightMs) {
+    const [y, m, dd] = d.flight_date.split('-').map(Number);
+    const prev = new Date(Date.UTC(y, m - 1, dd) - 86400000);
+    const yyyy = prev.getUTCFullYear();
+    const mm = String(prev.getUTCMonth() + 1).padStart(2, '0');
+    const ddd = String(prev.getUTCDate()).padStart(2, '0');
+    iso = localInputValueToUtcIso(`${yyyy}-${mm}-${ddd}T${d.flight_board_time}`, d.airport.tz);
+    ms = new Date(iso).getTime();
+  }
+  return Number.isFinite(ms) ? ms : null;
+}
+
 // Module-level draft so values survive re-renders within a single visit.
 let draft = null;
 let lastResult = null;
@@ -56,6 +77,7 @@ function defaultDraft() {
     international: false,
     flight_date: `${yyyy}-${mm}-${dd}`,
     flight_time: `${hh}:${mi}`,
+    flight_board_time: '',   // optional; departure-only anchor override
   };
 }
 
@@ -111,6 +133,11 @@ export async function predictScreen(root) {
             <input id="flight-time" type="time" value="${draft.flight_time}">
           </div>
         </div>
+        <div class="form-row" id="board-time-row" hidden>
+          <label for="board-time">Scheduled boarding (local) — optional</label>
+          <input id="board-time" type="time" value="${draft.flight_board_time}">
+          <p class="hint">If set, "Leave by" anchors on boarding time instead of takeoff.</p>
+        </div>
         <div id="dst-slot"></div>
 
         <div class="form-row">
@@ -163,6 +190,7 @@ export async function predictScreen(root) {
   bindToggles(root);
   bindAirport(root);
   bindDateTime(root);
+  bindBoardTime(root);
   bindOrigin(root);
   bindSubmit(root);
   applyDirectionLabel(root);
@@ -205,7 +233,9 @@ function applyDirectionLabel(root) {
   const labelEl = root.querySelector('#flight-time-label');
   const hintEl = root.querySelector('#direction-hint');
   const originLabel = root.querySelector('#origin-label');
-  if (draft.direction === 'departure') {
+  const boardRow = root.querySelector('#board-time-row');
+  const isDep = draft.direction === 'departure';
+  if (isDep) {
     labelEl.textContent = 'Scheduled departure (local)';
     hintEl.textContent = '"Leave by" answers when to leave home.';
     if (originLabel) originLabel.textContent = 'Origin address';
@@ -214,6 +244,7 @@ function applyDirectionLabel(root) {
     hintEl.textContent = '"Arrive by" answers when you\'ll reach the destination.';
     if (originLabel) originLabel.textContent = 'Destination address';
   }
+  if (boardRow) boardRow.hidden = !isDep;
 }
 
 function bindAirport(root) {
@@ -237,6 +268,17 @@ function bindDateTime(root) {
   root.querySelector('#flight-time').addEventListener('change', (e) => {
     draft.flight_time = e.target.value;
     revalidateDst(root);
+  });
+}
+
+// Boarding time is a pure UI anchor override — no service round-trip needed.
+// On change, re-render any cached result so "Leave by" updates live.
+function bindBoardTime(root) {
+  const inp = root.querySelector('#board-time');
+  if (!inp) return;
+  inp.addEventListener('input', (e) => {
+    draft.flight_board_time = e.target.value;
+    if (lastResult) renderResult(root, lastResult, lastDrive);
   });
 }
 
@@ -380,7 +422,13 @@ function renderResult(root, res, drive) {
   // from history, anchor the leave-by on (live drive + airport p90) instead
   // of the historical full-trip p90. This gives Nick today's traffic, not
   // a Tuesday from 2019.
-  const flightLabel = res.direction === 'departure' ? 'before flight' : 'after landing';
+  // Boarding-time override: for departures only, if the user supplied a
+  // boarding time, count back from boarding instead of takeoff. Pure UI
+  // layer — historical sample + persisted prediction row are unchanged.
+  const boardingMs = res.direction === 'departure' ? computeBoardingUtcMs(draft) : null;
+  const flightLabel = boardingMs
+    ? 'before boarding'
+    : (res.direction === 'departure' ? 'before flight' : 'after landing');
   const heroLabel   = res.direction === 'departure' ? 'Leave by'      : 'Arrive by';
   const sign        = res.direction === 'departure' ? -1              : 1;
 
@@ -400,12 +448,13 @@ function renderResult(root, res, drive) {
     null;
 
   const flightUtc = new Date(res.flight_utc).getTime();
+  const anchorUtc = boardingMs ?? flightUtc;
   // Buffer is layered on top of the model — same shift for hero +
   // comfortable. Pure UI; doesn't change the prediction row written by
   // the service.
   const buffer_s = bufferMin * 60;
   const heroOffsetS = baseHeroOffsetS != null ? baseHeroOffsetS + buffer_s : null;
-  const heroDate  = heroOffsetS != null ? new Date(flightUtc + sign * heroOffsetS * 1000) : null;
+  const heroDate  = heroOffsetS != null ? new Date(anchorUtc + sign * heroOffsetS * 1000) : null;
   const heroTime  = heroDate ? formatLocal(heroDate, res.airport.tz) : '—';
   const heroDelta = heroOffsetS != null ? humanDuration(heroOffsetS) : '';
 
@@ -414,7 +463,7 @@ function renderResult(root, res, drive) {
   let comfortable = '';
   if (baseComfortableOffsetS != null) {
     const offS = baseComfortableOffsetS + buffer_s;
-    const cDate = new Date(flightUtc + sign * offS * 1000);
+    const cDate = new Date(anchorUtc + sign * offS * 1000);
     comfortable = `
       <div class="predict-comfortable">
         <span class="predict-comfortable-label">Comfortable:</span>
@@ -479,13 +528,13 @@ function renderResult(root, res, drive) {
       const heroS = baseHeroOffsetS != null ? baseHeroOffsetS + bs : null;
       const compS = baseComfortableOffsetS != null ? baseComfortableOffsetS + bs : null;
       if (heroS != null) {
-        const d = new Date(flightUtc + sign * heroS * 1000);
+        const d = new Date(anchorUtc + sign * heroS * 1000);
         root.querySelector('[data-hero-time]').textContent = formatLocal(d, res.airport.tz);
         root.querySelector('[data-hero-delta]').textContent =
           `${humanDuration(heroS)} ${flightLabel}${heroSourceTag}`;
       }
       if (compS != null) {
-        const cd = new Date(flightUtc + sign * compS * 1000);
+        const cd = new Date(anchorUtc + sign * compS * 1000);
         const ct = root.querySelector('[data-comfortable-time]');
         const cd2 = root.querySelector('[data-comfortable-delta]');
         if (ct) ct.textContent = formatLocal(cd, res.airport.tz);
@@ -524,6 +573,7 @@ function renderResult(root, res, drive) {
       international: draft.international,
       sched_dep_date: draft.flight_date,
       sched_dep_time: draft.flight_time,
+      sched_dep_board_time: draft.flight_board_time || '',
     };
     // Stash on window so log.js can read it on mount. Module-state would be
     // cleaner but log.js doesn't import predict.js (and we don't want it to
