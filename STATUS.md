@@ -137,6 +137,7 @@ Every file in `./secrets/` is `chmod 0600`, gitignored. Regenerated via `./scrip
 | `dbdb3fe` | predict — past-trips list (every match, sortable, tappable) |
 | `76f7e32` | predict — buffer slider for food / lounge / breathing room |
 | `83b247c` | scheduled boarding — predict anchor + trip-start sheet field + migration 009 + handoff |
+| _next_ | buffer-to-boarding — per-trip in history + aggregate p50/p90 in predict (security → boarding, inferred when boarding null) |
 
 Diff against `main` (what changed since last push): `git log --oneline origin/main..HEAD` — should be empty if everything's pushed.
 
@@ -186,6 +187,7 @@ Diff against `main` (what changed since last push): `git log --oneline origin/ma
 ## Schema changes for scheduled boarding
 
 - Migration `009-trips-sched-dep-board-local.sql` adds nullable `sched_dep_board_local` (`time without time zone`) to `public.trips` and re-creates `api.trips` so the column slots next to `sched_dep_local`. Stored as TIME (not TIMESTAMP) to mirror `sched_dep_local`; the boarding date is implicitly `sched_dep_date` with prev-day inferred client-side for red-eyes (boarding > flight on same date → boarding is the previous day). Predict screen anchors "Leave by" on boarding when set (pure UI layer — does not change the persisted prediction row); the dep trip-start sheet has an optional boarding input; Predict→Trip handoff carries `sched_dep_board_time` so the value flows from prediction into the logged trip. Legacy and pre-migration trips carry null — no backfill.
+- **Buffer-to-boarding metric.** Derived from `boarding_anchor - dep_security.logged_at` where `boarding_anchor` is `sched_dep_board_local` (explicit) or `sched_dep_local - 30 min` (inferred — universal "boarding closes ~30 min before takeoff" assumption). Surfaces in two places: the per-trip history timeline header gets one line ("Buffer to boarding: 51 min" with an "inferred" badge when boarding wasn't explicit), and the predict result card gets a "Buffer to boarding, history" row in the segments breakdown (p50 + p90 + sample count, departure-only — arrival short-circuits to `sample_n=0` in the service). Predict service runs `runBufferQuery` through the same widening loop as drive/airport. No new schema — pure derivation off existing `sched_dep_local` + `sched_dep_board_local` + dep_security milestones; legacy LGA already has 22 trips' worth of useful buffer history.
 
 ## External accounts / dashboards
 

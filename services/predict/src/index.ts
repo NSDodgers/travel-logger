@@ -150,6 +150,7 @@ async function handlePredict(req: PredictRequest): Promise<Response> {
   const trip    = await withWidening(runQuery,                req.direction, startFilters);
   const drive   = await withWidening(runDriveSegmentQuery,    req.direction, startFilters);
   const airportSeg = await withWidening(runAirportSegmentQuery, req.direction, startFilters);
+  const buffer  = await withWidening(runBufferQuery,          req.direction, startFilters);
 
   const result = trip.result;
   const relaxed = trip.relaxed;
@@ -247,6 +248,18 @@ async function handlePredict(req: PredictRequest): Promise<Response> {
         min_s: airportSeg.result.min_s,
         max_s: airportSeg.result.max_s,
         relaxed_filters: airportSeg.relaxed,
+      },
+      // Buffer to boarding = boarding_anchor - dep_security.logged_at, where
+      // boarding is sched_dep_board_local (explicit) or sched_dep_local - 30
+      // min (inferred). Departures only — arrivals get an empty sample. Lets
+      // the user calibrate how much real breathing room they tend to leave.
+      buffer: {
+        sample_n: buffer.result.sample_n,
+        p50_s: buffer.result.p50_s,
+        p90_s: buffer.result.p90_s,
+        min_s: buffer.result.min_s,
+        max_s: buffer.result.max_s,
+        relaxed_filters: buffer.relaxed,
       },
     },
     matched_trips: matched,
@@ -461,6 +474,82 @@ async function runAirportSegmentQuery(direction: Direction, f: FilterSet): Promi
       max(gap_s)                                          as max_s,
       (array_agg(gap_s order by gap_s))[1:200]            as durations_s
     from airport_window
+  `;
+  const r = rows[0];
+  return {
+    sample_n: r.sample_n,
+    incomplete_n: r.incomplete_n,
+    complete_n: r.complete_n,
+    p50_s: r.p50_s,
+    p90_s: r.p90_s,
+    min_s: r.min_s,
+    max_s: r.max_s,
+    durations_s: r.durations_s ?? [],
+  };
+}
+
+// Buffer to boarding: boarding_utc - dep_security.logged_at. Departures only
+// (arrivals don't board). Boarding source per-trip: explicit
+// sched_dep_board_local when present, else sched_dep_local - 30 min — the
+// universal "boarding closes ~30 min before takeoff" assumption. Red-eyes
+// (boarding > flight on same date) shift to the previous day.
+async function runBufferQuery(direction: Direction, f: FilterSet): Promise<QueryResult> {
+  if (direction !== "departure") {
+    return {
+      sample_n: 0, incomplete_n: 0, complete_n: 0,
+      p50_s: null, p90_s: null, min_s: null, max_s: null, durations_s: [],
+    };
+  }
+  const rows = await sql<{
+    sample_n: number;
+    incomplete_n: number;
+    complete_n: number;
+    p50_s: number | null;
+    p90_s: number | null;
+    min_s: number | null;
+    max_s: number | null;
+    durations_s: number[] | null;
+  }[]>`
+    with anchored as (
+      select
+        t.id as trip_id,
+        t.status,
+        extract(epoch from (
+          (case
+            when t.sched_dep_board_local is not null then
+              case when t.sched_dep_board_local > t.sched_dep_local
+                then ((t.sched_dep_date - 1)::timestamp + t.sched_dep_board_local) at time zone a.tz
+                else (t.sched_dep_date::timestamp + t.sched_dep_board_local) at time zone a.tz
+              end
+            else
+              ((t.sched_dep_date::timestamp + t.sched_dep_local) - interval '30 minutes') at time zone a.tz
+          end) - m.logged_at
+        ))::float8 as buffer_s
+      from public.trips t
+      join public.airports a on a.iata = t.dep_airport
+      join public.milestones m on m.trip_id = t.id and m.kind = 'dep_security' and m.void = false
+      where t.direction = 'departure'
+        and t.dep_airport = ${f.airport}
+        and t.international = ${f.international}
+        and t.test = false
+        and t.status <> 'in_progress'
+        and t.sched_dep_local is not null
+        and t.sched_dep_date is not null
+        and (${f.bags}::text is null or t.bags = ${f.bags}::text)
+        and (${f.party}::text is null or t.party = ${f.party}::text)
+        and (${f.transit}::text is null or t.transit = ${f.transit}::text)
+        and (${f.tsa_precheck}::boolean is null or t.tsa_precheck = ${f.tsa_precheck}::boolean)
+    )
+    select
+      count(*)::int                                          as sample_n,
+      count(*) filter (where status = 'abandoned')::int      as incomplete_n,
+      count(*) filter (where status = 'complete')::int       as complete_n,
+      percentile_cont(0.50) within group (order by buffer_s) as p50_s,
+      percentile_cont(0.90) within group (order by buffer_s) as p90_s,
+      min(buffer_s)                                          as min_s,
+      max(buffer_s)                                          as max_s,
+      (array_agg(buffer_s order by buffer_s))[1:200]         as durations_s
+    from anchored
   `;
   const r = rows[0];
   return {

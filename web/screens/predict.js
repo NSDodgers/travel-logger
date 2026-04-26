@@ -653,11 +653,26 @@ function segmentsHtml(res, drive) {
     ? `<p class="predict-segment-hint">No live drive estimate — pick an origin address and set Transit to Car for today's traffic-aware ETA.</p>`
     : '';
 
+  // Buffer to boarding (history). Departure-only — describes how much real
+  // breathing room you tend to leave between clearing security and boarding.
+  // Helps calibrate the buffer slider with data instead of vibes.
+  const bufferSeg = res.segments?.buffer ?? null;
+  const bufferRow = dep && bufferSeg && bufferSeg.sample_n > 0
+    ? `
+      <div class="predict-segment-row">
+        <span class="predict-segment-key">Buffer to boarding, history</span>
+        <span class="predict-segment-val">p50 ${escapeHtml(shortDuration(bufferSeg.p50_s))} · p90 ${escapeHtml(shortDuration(bufferSeg.p90_s))}</span>
+        <span class="predict-segment-aux">${bufferSeg.sample_n} trip${bufferSeg.sample_n === 1 ? '' : 's'}${bufferSeg.relaxed_filters.length ? ' · relaxed: ' + bufferSeg.relaxed_filters.map(prettyFilterName).join(', ') : ''} · security → boarding</span>
+      </div>
+    `
+    : '';
+
   return `
     <div class="predict-segments">
       ${liveRow}
       ${driveHistRow}
       ${airportRow}
+      ${bufferRow}
       ${fallbackHint}
     </div>
   `;
