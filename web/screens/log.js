@@ -16,6 +16,7 @@ import {
   checkDst,
   checkDstCode,
 } from '../dst.js';
+import { list as listSavedPredictions, dismiss as dismissSavedPrediction } from '../saved-predictions.js';
 
 // ── Module-level state ─────────────────────────────────────────────────────
 
@@ -148,8 +149,16 @@ function renderFatal(root, err) {
 // ── Empty state ────────────────────────────────────────────────────────────
 
 function renderEmpty(root) {
+  // Saved predictions (M15): if Nick saved a prediction earlier, surface it
+  // as a banner above the empty heroes so the trip plan can be resumed even
+  // after a reload or a day passing. The banner taps into the same handoff
+  // path that "Start this trip →" uses on the Predict tab.
+  const saved = listSavedPredictions();
+  const savedHtml = saved.map(savedBannerHtml).join('');
+
   root.innerHTML = `
-    <section class="log-screen log-screen-empty">
+    <section class="log-screen log-screen-empty${saved.length ? ' log-screen-with-banners' : ''}">
+      ${savedHtml}
       <button class="log-hero log-hero-dep" id="start-dep-btn">
         Dep: In Transit
         <span class="log-hero-sub">Tap to start a departure</span>
@@ -162,6 +171,97 @@ function renderEmpty(root) {
   `;
   root.querySelector('#start-dep-btn').addEventListener('click', () => openDepStartSheet());
   root.querySelector('#start-arr-btn').addEventListener('click', () => openArrivalStartSheet());
+
+  // Wire each saved-prediction banner. Tap body → resume into the trip-start
+  // sheet with the saved values pre-filled. Tap × → drop the entry only.
+  root.querySelectorAll('.saved-prediction-banner').forEach((el) => {
+    const id = el.dataset.id;
+    el.querySelector('[data-resume]')?.addEventListener('click', () => {
+      const entry = listSavedPredictions().find((p) => p.id === id);
+      if (!entry) { renderEmpty(root); return; }
+      const handoff = handoffFromSaved(entry);
+      // Consume on resume — once the trip starts logging, the saved entry
+      // has done its job. (If the user backs out of the start sheet without
+      // confirming, they can re-save from Predict.) Re-render so the banner
+      // is gone if the user cancels the sheet rather than confirming.
+      dismissSavedPrediction(id);
+      renderEmpty(root);
+      if (entry.direction === 'departure') openDepStartSheet(handoff);
+      else openArrivalStartSheet(handoff);
+    });
+    el.querySelector('[data-dismiss]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismissSavedPrediction(id);
+      renderEmpty(root);
+    });
+  });
+}
+
+function handoffFromSaved(p) {
+  return {
+    direction: p.direction,
+    airport: p.airport,
+    origin_id: p.origin_id,
+    bags: p.bags,
+    party: p.party,
+    transit: p.transit,
+    tsa_precheck: p.tsa_precheck,
+    international: p.international,
+    sched_dep_date: p.flight_date_local,
+    sched_dep_time: p.flight_time_local,
+    sched_dep_board_time: p.flight_board_time_local || '',
+  };
+}
+
+function savedBannerHtml(p) {
+  const sign = p.direction === 'departure' ? -1 : 1;
+  const leaveByMs = p.hero_anchor_utc_ms + sign * p.hero_offset_s * 1000;
+  const tz = p.airport?.tz;
+  const heroTime = formatBannerTime(leaveByMs, tz);
+  const flightTime = formatBannerFlight(p.flight_utc_ms, tz);
+  const dirTag = p.direction === 'departure' ? 'Dep' : 'Arr';
+  const fromTo = p.origin_label
+    ? (p.direction === 'departure' ? `from ${p.origin_label}` : `to ${p.origin_label}`)
+    : '';
+  return `
+    <div class="saved-prediction-banner" data-id="${escapeAttr(p.id)}">
+      <button class="saved-prediction-resume" type="button" data-resume>
+        <span class="saved-prediction-action">${escapeHtml(p.hero_action)} ${escapeHtml(heroTime)}</span>
+        <span class="saved-prediction-sub">
+          <span class="saved-prediction-dir">${dirTag}</span>
+          <span class="saved-prediction-iata">${escapeHtml(p.airport?.iata ?? '')}</span>
+          <span class="saved-prediction-flight">${escapeHtml(flightTime)}</span>
+          ${fromTo ? `<span class="saved-prediction-origin">${escapeHtml(fromTo)}</span>` : ''}
+        </span>
+      </button>
+      <button class="saved-prediction-dismiss" type="button" data-dismiss aria-label="Dismiss saved prediction">×</button>
+    </div>
+  `;
+}
+
+function formatBannerTime(ms, tz) {
+  if (!Number.isFinite(ms)) return '—';
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric', minute: '2-digit',
+      timeZone: tz,
+    }).format(new Date(ms));
+  } catch {
+    return new Date(ms).toLocaleString();
+  }
+}
+
+function formatBannerFlight(ms, tz) {
+  if (!Number.isFinite(ms)) return '';
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+      timeZone: tz,
+    }).format(new Date(ms));
+  } catch {
+    return new Date(ms).toLocaleString();
+  }
 }
 
 // ── Active state — log grid ────────────────────────────────────────────────

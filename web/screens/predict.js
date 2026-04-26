@@ -17,6 +17,7 @@ import { api, ApiError } from '../api.js';
 import { mountAirportPicker } from './airport-picker.js';
 import { checkDst, localInputValueToUtcIso } from '../dst.js';
 import { drivingDirections } from '../mapbox.js';
+import { save as saveSavedPrediction, findMatch as findSavedPrediction } from '../saved-predictions.js';
 
 // Convert the form's local date+time to a UTC epoch ms via the airport's
 // tz. Returns null when any piece is missing.
@@ -509,7 +510,10 @@ function renderResult(root, res, drive) {
         <button type="button" class="btn btn-primary" id="start-trip-from-predict">
           Start this trip →
         </button>
-        <p class="hint">Opens the trip-start sheet with these values pre-filled.</p>
+        <button type="button" class="btn btn-secondary" id="save-prediction-btn">
+          Save for later
+        </button>
+        <p class="hint">Save shows a banner on the Log screen until your flight time.</p>
       </div>
       ${matchedTripsHtml(res)}
     </div>
@@ -582,6 +586,55 @@ function renderResult(root, res, drive) {
     window.__predictHandoff = handoff;
     location.hash = '/log';
   });
+
+  // Save-for-later: persist the current prediction so the Log screen can
+  // surface it as a banner when the trip day arrives. Captures the live
+  // buffer-slider value + the hero anchor/offset already computed above
+  // so the banner can render an exact "Leave by HH:MM" without re-running
+  // the model.
+  const saveBtn = root.querySelector('#save-prediction-btn');
+  if (saveBtn) {
+    if (findSavedPrediction({
+      direction: draft.direction,
+      airport: draft.airport,
+      flight_date_local: draft.flight_date,
+      flight_time_local: draft.flight_time,
+    })) {
+      saveBtn.textContent = 'Update saved';
+    }
+    saveBtn.addEventListener('click', () => {
+      if (!Number.isFinite(flightUtc) || baseHeroOffsetS == null) {
+        window.__toast?.('Nothing to save yet — predict first', { level: 'error' });
+        return;
+      }
+      const heroOffsetWithBuffer = baseHeroOffsetS + bufferMin * 60;
+      const originRow = draft.origin_id
+        ? cachedAddresses?.find((a) => a.id === draft.origin_id) ?? null
+        : null;
+      saveSavedPrediction({
+        direction: draft.direction,
+        airport: draft.airport,
+        origin_id: draft.origin_id,
+        origin_label: originRow?.label ?? null,
+        bags: draft.bags,
+        party: draft.party,
+        transit: draft.transit,
+        tsa_precheck: draft.tsa_precheck,
+        international: draft.international,
+        flight_date_local: draft.flight_date,
+        flight_time_local: draft.flight_time,
+        flight_board_time_local: draft.flight_board_time || '',
+        flight_utc_ms: flightUtc,
+        hero_anchor_utc_ms: anchorUtc,
+        hero_offset_s: heroOffsetWithBuffer,
+        hero_action: heroLabel,
+        hero_source: heroSource,
+        buffer_min: bufferMin,
+      });
+      saveBtn.textContent = 'Saved ✓';
+      window.__toast?.('Saved — see banner on Log screen', { level: 'info' });
+    });
+  }
 }
 
 // Drive vs airport breakdown. Always shows historical drive percentiles; if

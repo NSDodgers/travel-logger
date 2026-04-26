@@ -1313,3 +1313,81 @@ a { color: var(--accent); text-decoration: none; }
 .predict-trip-badge.test { color: var(--warning); }
 .predict-trip-badge.legacy { color: var(--muted); }
 
+/* M15: saved-prediction banner on the Log empty state. Stacks above the
+   Dep + Arr heroes; the heroes share the remaining viewport. Switching to
+   flex avoids juggling a dynamic grid-template-rows with N saved banners. */
+.log-screen-empty.log-screen-with-banners {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.log-screen-empty.log-screen-with-banners .saved-prediction-banner {
+  flex: 0 0 auto;
+}
+.log-screen-empty.log-screen-with-banners .log-hero {
+  flex: 1 1 0;
+}
+.saved-prediction-banner {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.saved-prediction-resume {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.saved-prediction-resume:active { background: var(--surface-2); }
+.saved-prediction-action {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--accent);
+}
+.saved-prediction-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.saved-prediction-dir {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.saved-prediction-iata {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+.saved-prediction-flight { color: var(--text); }
+.saved-prediction-origin { color: var(--muted); }
+.saved-prediction-dismiss {
+  flex: 0 0 auto;
+  width: 44px;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.saved-prediction-dismiss:active { background: var(--surface-2); color: var(--text); }
+
