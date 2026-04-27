@@ -210,6 +210,9 @@ function handoffFromSaved(p) {
     sched_dep_date: p.flight_date_local,
     sched_dep_time: p.flight_time_local,
     sched_dep_board_time: p.flight_board_time_local || '',
+    sched_arr_date: p.landing_date_local || '',
+    sched_arr_time: p.landing_time_local || '',
+    segments_snapshot: p.segments_snapshot || null,
   };
 }
 
@@ -313,6 +316,7 @@ function renderActive(root) {
     const tripId = state.trip.id;
     api.patch(`/trips?id=eq.${tripId}`, { status: 'abandoned' },
       { intent: 'abandon_trip', trip_id: tripId });
+    clearSegmentsForTrip(tripId);
     state.trip = null; state.milestones = [];
     window.__toast?.('Trip abandoned', { level: 'info' });
     renderScreen(root);
@@ -388,8 +392,10 @@ function renderAllDone(root, visibleKinds, loggedByKind) {
   root.querySelector('#finish-tile').addEventListener('click', () => completeTrip(root));
   root.querySelector('#abandon-trip-btn').addEventListener('click', async () => {
     if (!confirm('Abandon this in-progress trip? Logged milestones stay in history.')) return;
+    const tripId = state.trip.id;
     try {
-      await api.patch(`/trips?id=eq.${state.trip.id}`, { status: 'abandoned' });
+      await api.patch(`/trips?id=eq.${tripId}`, { status: 'abandoned' });
+      clearSegmentsForTrip(tripId);
       state.trip = null; state.milestones = [];
       window.__toast?.('Trip abandoned', { level: 'info' });
       renderScreen(root);
@@ -426,11 +432,13 @@ async function logMilestone(root, kind) {
   }, { intent: 'log_milestone', trip_id: tripId, milestone_id: optimistic.id });
 
   haptic(10);
-  showUndoToast(root, optimistic.id, tripId, kindLabel(kind));
+  const comparison = segmentComparisonLine(tripId, kind, optimistic.logged_at);
+  showUndoToast(root, optimistic.id, tripId, kindLabel(kind), comparison);
 }
 
-function showUndoToast(root, milestoneId, tripId, label) {
-  window.__toast?.(`Logged: ${label}`, {
+function showUndoToast(root, milestoneId, tripId, label, comparison = '') {
+  const msg = comparison ? `Logged: ${label} · ${comparison}` : `Logged: ${label}`;
+  window.__toast?.(msg, {
     level: 'success',
     ms: 60_000,
     action: {
@@ -489,6 +497,7 @@ function completeTrip(root) {
   api.patch(`/trips?id=eq.${tripId}`, { status: 'complete' },
     { intent: 'complete_trip', trip_id: tripId });
   completedThisSession.add(tripId);
+  clearSegmentsForTrip(tripId);
   window.__toast?.('Trip complete 🎉', { level: 'success', ms: 4000 });
   state.trip = null;
   state.milestones = [];
@@ -592,8 +601,8 @@ async function openDepStartSheet(handoff = null) {
     sched_dep_date: handoff?.sched_dep_date ?? '',
     sched_dep_time: handoff?.sched_dep_time ?? '',
     sched_dep_board_time: handoff?.sched_dep_board_time ?? '',
-    sched_arr_date: '',
-    sched_arr_time: '',
+    sched_arr_date: handoff?.sched_arr_date ?? '',
+    sched_arr_time: handoff?.sched_arr_time ?? '',
     bags: initialBags,
     party: initialParty,
     transit: initialTransit,
@@ -758,6 +767,8 @@ async function openDepStartSheet(handoff = null) {
       };
       if (draft.sched_dep_date) fields.depDate.value = draft.sched_dep_date;
       if (draft.sched_dep_time) fields.depTime.value = draft.sched_dep_time;
+      if (draft.sched_arr_date) fields.arrDate.value = draft.sched_arr_date;
+      if (draft.sched_arr_time) fields.arrTime.value = draft.sched_arr_time;
       Object.entries(fields).forEach(([k, el]) => {
         el.addEventListener('change', () => {
           draft[`sched_${k.startsWith('dep') ? 'dep' : 'arr'}_${k.endsWith('Date') ? 'date' : 'time'}`] = el.value;
@@ -797,6 +808,7 @@ async function openDepStartSheet(handoff = null) {
         startBtn.textContent = 'Starting…';
         try {
           await startTrip(draft);
+          stashSegmentsForTrip(state.trip?.id, handoff?.segments_snapshot);
           close();
         } catch (err) {
           console.error(err);
@@ -1092,6 +1104,7 @@ async function openArrivalStartSheet(handoff = null) {
         startBtn.textContent = 'Starting…';
         try {
           await startArrivalTrip(draft);
+          stashSegmentsForTrip(state.trip?.id, handoff?.segments_snapshot);
           close();
         } catch (err) {
           console.error(err);
@@ -1254,3 +1267,79 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
+
+// ── Predicted-vs-actual per-leg toast ──────────────────────────────────────
+//
+// At trip start (Predict→Trip handoff or saved-prediction resume) we snapshot
+// the drive + airport segment percentiles to localStorage keyed by trip id.
+// At each segment-boundary milestone tap, we compare actual leg duration to
+// those numbers and show a toast. Pure client-side; doesn't touch the
+// predictions table or feed M13 calibration scoring.
+
+const SEGMENT_KEY_PREFIX = 'travel:trip-segments:';
+
+function stashSegmentsForTrip(tripId, snapshot) {
+  if (!tripId || !snapshot) return;
+  try {
+    localStorage.setItem(SEGMENT_KEY_PREFIX + tripId, JSON.stringify(snapshot));
+  } catch (err) {
+    console.warn('stashSegmentsForTrip: write failed', err);
+  }
+}
+
+function readSegmentsForTrip(tripId) {
+  if (!tripId) return null;
+  try {
+    const raw = localStorage.getItem(SEGMENT_KEY_PREFIX + tripId);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearSegmentsForTrip(tripId) {
+  if (!tripId) return;
+  try { localStorage.removeItem(SEGMENT_KEY_PREFIX + tripId); } catch {}
+}
+
+// Map the just-tapped milestone kind to (segment, prior endpoint kind, label).
+// Only segment-boundary kinds appear here — intermediate taps return null.
+function segmentForKind(kind) {
+  switch (kind) {
+    case 'dep_at_airport':    return { segment: 'drive',   prior: 'dep_in_transit',   label: 'Drive' };
+    case 'dep_security':      return { segment: 'airport', prior: 'dep_at_airport',   label: 'Airport' };
+    case 'arr_in_transit':    return { segment: 'airport', prior: 'arr_off_plane',    label: 'Airport' };
+    case 'arr_at_destination': return { segment: 'drive',  prior: 'arr_in_transit',   label: 'Drive' };
+    default:                  return null;
+  }
+}
+
+// Returns a one-line "Drive: 38m · predicted 32m p50 / 45m p90 · ahead of
+// plan ✓" string, or '' when no snapshot or no prior endpoint. Folded into
+// the undo toast so the user sees comparison + Undo without one stomping
+// the other (toast container is single-instance).
+function segmentComparisonLine(tripId, kind, loggedAtIso) {
+  const map = segmentForKind(kind);
+  if (!map) return '';
+  const snap = readSegmentsForTrip(tripId);
+  const seg = snap?.[map.segment];
+  if (!seg || seg.p50_s == null || seg.p90_s == null) return '';
+  const prior = state.milestones.find((m) => m.kind === map.prior);
+  if (!prior) return '';
+  const actualS = (new Date(loggedAtIso).getTime() - new Date(prior.logged_at).getTime()) / 1000;
+  if (!Number.isFinite(actualS) || actualS <= 0) return '';
+
+  const verdict = actualS < seg.p50_s ? ' · ahead of plan ✓'
+                : actualS > seg.p90_s ? ' · running long'
+                : '';
+  return `${map.label}: ${formatMins(actualS)} · predicted ${formatMins(seg.p50_s)} p50 / ${formatMins(seg.p90_s)} p90${verdict}`;
+}
+
+function formatMins(seconds) {
+  if (seconds == null) return '';
+  const total = Math.round(seconds / 60);
+  if (total < 60) return `${total}m`;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return m ? `${h}h${m}m` : `${h}h`;
+}

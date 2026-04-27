@@ -79,6 +79,8 @@ function defaultDraft() {
     flight_date: `${yyyy}-${mm}-${dd}`,
     flight_time: `${hh}:${mi}`,
     flight_board_time: '',   // optional; departure-only anchor override
+    landing_date: '',        // optional; departure-only — carries into trip-start sheet's sched_arr
+    landing_time: '',
   };
 }
 
@@ -133,6 +135,14 @@ export async function predictScreen(root) {
             <input id="flight-date" type="date" value="${draft.flight_date}">
             <input id="flight-time" type="time" value="${draft.flight_time}">
           </div>
+        </div>
+        <div class="form-row" id="landing-time-row" hidden>
+          <label>Scheduled landing (local) — optional</label>
+          <div class="datetime-row">
+            <input id="landing-date" type="date" value="${draft.landing_date}">
+            <input id="landing-time" type="time" value="${draft.landing_time}">
+          </div>
+          <p class="hint">Carries into the trip so you don't retype it on Start.</p>
         </div>
         <div class="form-row" id="board-time-row" hidden>
           <label for="board-time">Scheduled boarding (local) — optional</label>
@@ -191,6 +201,7 @@ export async function predictScreen(root) {
   bindToggles(root);
   bindAirport(root);
   bindDateTime(root);
+  bindLandingTime(root);
   bindBoardTime(root);
   bindOrigin(root);
   bindSubmit(root);
@@ -235,6 +246,7 @@ function applyDirectionLabel(root) {
   const hintEl = root.querySelector('#direction-hint');
   const originLabel = root.querySelector('#origin-label');
   const boardRow = root.querySelector('#board-time-row');
+  const landingRow = root.querySelector('#landing-time-row');
   const isDep = draft.direction === 'departure';
   if (isDep) {
     labelEl.textContent = 'Scheduled departure (local)';
@@ -246,6 +258,9 @@ function applyDirectionLabel(root) {
     if (originLabel) originLabel.textContent = 'Destination address';
   }
   if (boardRow) boardRow.hidden = !isDep;
+  // Departure-only: the arrival flow already takes landing as its primary
+  // input, and the dep flow needs landing as an extra carry-through field.
+  if (landingRow) landingRow.hidden = !isDep;
 }
 
 function bindAirport(root) {
@@ -270,6 +285,17 @@ function bindDateTime(root) {
     draft.flight_time = e.target.value;
     revalidateDst(root);
   });
+}
+
+// Optional landing date+time. Departure-only — Predict doesn't model the
+// destination (no arrival airport/tz captured), so we just hold the strings
+// and pass them through the handoff into the trip-start sheet's existing
+// sched_arr inputs. DST validation runs there once arr_airport is picked.
+function bindLandingTime(root) {
+  const d = root.querySelector('#landing-date');
+  const t = root.querySelector('#landing-time');
+  if (d) d.addEventListener('change', (e) => { draft.landing_date = e.target.value; });
+  if (t) t.addEventListener('change', (e) => { draft.landing_time = e.target.value; });
 }
 
 // Boarding time is a pure UI anchor override — no service round-trip needed.
@@ -578,6 +604,9 @@ function renderResult(root, res, drive) {
       sched_dep_date: draft.flight_date,
       sched_dep_time: draft.flight_time,
       sched_dep_board_time: draft.flight_board_time || '',
+      sched_arr_date: draft.landing_date || '',
+      sched_arr_time: draft.landing_time || '',
+      segments_snapshot: snapshotSegments(res),
     };
     // Stash on window so log.js can read it on mount. Module-state would be
     // cleaner but log.js doesn't import predict.js (and we don't want it to
@@ -624,12 +653,15 @@ function renderResult(root, res, drive) {
         flight_date_local: draft.flight_date,
         flight_time_local: draft.flight_time,
         flight_board_time_local: draft.flight_board_time || '',
+        landing_date_local: draft.landing_date || '',
+        landing_time_local: draft.landing_time || '',
         flight_utc_ms: flightUtc,
         hero_anchor_utc_ms: anchorUtc,
         hero_offset_s: heroOffsetWithBuffer,
         hero_action: heroLabel,
         hero_source: heroSource,
         buffer_min: bufferMin,
+        segments_snapshot: snapshotSegments(res),
       });
       saveBtn.textContent = 'Saved ✓';
       window.__toast?.('Saved — see banner on Log screen', { level: 'info' });
@@ -962,4 +994,24 @@ function escapeHtml(s) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// Snapshot the segment percentiles so the log screen can show "actual vs
+// predicted" toasts at segment-boundary milestone taps. Trims the response
+// to just the numbers we need — drive (in_transit ↔ at_airport endpoints)
+// and airport (at_airport ↔ off-plane / security / in_transit endpoints).
+// Buffer-to-boarding is intentionally omitted: it's clock-anchored, not
+// milestone-anchored, so it doesn't fit the per-tap comparison shape.
+function snapshotSegments(res) {
+  const drive = res?.segments?.drive;
+  const airport = res?.segments?.airport;
+  const slim = (s) => s && s.sample_n > 0 && s.p50_s != null && s.p90_s != null
+    ? { p50_s: s.p50_s, p90_s: s.p90_s, sample_n: s.sample_n }
+    : null;
+  const out = {};
+  const d = slim(drive);
+  const a = slim(airport);
+  if (d) out.drive = d;
+  if (a) out.airport = a;
+  return Object.keys(out).length ? out : null;
 }

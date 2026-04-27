@@ -510,6 +510,20 @@ a { color: var(--accent); text-decoration: none; }
   color: var(--text);
 }
 
+/* Standalone time/date inputs (e.g. boarding-time row) need the same box
+   as .datetime-row inputs — without a rule here they render as bare
+   browser defaults and disappear against the dark background. */
+.form-row > input[type="time"],
+.form-row > input[type="date"] {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  color: var(--text);
+}
+
 /* DST warning slot inside the trip sheet. */
 .dst-warning {
   padding: 10px 12px;
