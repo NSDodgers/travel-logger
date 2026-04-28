@@ -296,6 +296,7 @@ function renderActive(root) {
           <button id="abandon-trip-btn">Abandon</button>
         </div>
       </div>
+      ${legPanelHtml(state.trip)}
       <div class="log-grid">
         <button class="log-hero-tile" id="hero-tile" data-kind="${escapeAttr(heroKind.kind)}">
           ${escapeHtml(heroKind.label)}
@@ -378,6 +379,7 @@ function renderAllDone(root, visibleKinds, loggedByKind) {
           <button id="abandon-trip-btn">Abandon</button>
         </div>
       </div>
+      ${legPanelHtml(state.trip)}
       <div class="log-grid">
         <button class="log-hero-tile" id="finish-tile" style="background:var(--success);color:#000">
           ✓ All milestones logged
@@ -432,13 +434,11 @@ async function logMilestone(root, kind) {
   }, { intent: 'log_milestone', trip_id: tripId, milestone_id: optimistic.id });
 
   haptic(10);
-  const comparison = segmentComparisonLine(tripId, kind, optimistic.logged_at);
-  showUndoToast(root, optimistic.id, tripId, kindLabel(kind), comparison);
+  showUndoToast(root, optimistic.id, tripId, kindLabel(kind));
 }
 
-function showUndoToast(root, milestoneId, tripId, label, comparison = '') {
-  const msg = comparison ? `Logged: ${label} · ${comparison}` : `Logged: ${label}`;
-  window.__toast?.(msg, {
+function showUndoToast(root, milestoneId, tripId, label) {
+  window.__toast?.(`Logged: ${label}`, {
     level: 'success',
     ms: 60_000,
     action: {
@@ -1268,13 +1268,13 @@ function escapeHtml(s) {
 }
 function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
 
-// ── Predicted-vs-actual per-leg toast ──────────────────────────────────────
+// ── Predicted-vs-actual per-leg panel ──────────────────────────────────────
 //
 // At trip start (Predict→Trip handoff or saved-prediction resume) we snapshot
-// the drive + airport segment percentiles to localStorage keyed by trip id.
-// At each segment-boundary milestone tap, we compare actual leg duration to
-// those numbers and show a toast. Pure client-side; doesn't touch the
-// predictions table or feed M13 calibration scoring.
+// drive + airport segment percentiles to localStorage keyed by trip id. The
+// active log screen renders an inline panel above the grid that accumulates
+// a row per completed leg, comparing actual vs typical. Pure client-side;
+// doesn't touch the predictions table or feed M13 calibration scoring.
 
 const SEGMENT_KEY_PREFIX = 'travel:trip-segments:';
 
@@ -1302,37 +1302,62 @@ function clearSegmentsForTrip(tripId) {
   try { localStorage.removeItem(SEGMENT_KEY_PREFIX + tripId); } catch {}
 }
 
-// Map the just-tapped milestone kind to (segment, prior endpoint kind, label).
-// Only segment-boundary kinds appear here — intermediate taps return null.
-function segmentForKind(kind) {
-  switch (kind) {
-    case 'dep_at_airport':    return { segment: 'drive',   prior: 'dep_in_transit',   label: 'Drive' };
-    case 'dep_security':      return { segment: 'airport', prior: 'dep_at_airport',   label: 'Airport' };
-    case 'arr_in_transit':    return { segment: 'airport', prior: 'arr_off_plane',    label: 'Airport' };
-    case 'arr_at_destination': return { segment: 'drive',  prior: 'arr_in_transit',   label: 'Drive' };
-    default:                  return null;
+// Direction-keyed segment endpoints. Drive and airport segments each have a
+// (start, end) pair. When both milestones are logged for a segment, we have
+// an actual duration to compare against the snapshot's predicted p50/p90.
+const SEGMENT_ENDPOINTS = {
+  departure: [
+    { segment: 'drive',   start: 'dep_in_transit',   end: 'dep_at_airport',     label: 'Drive' },
+    { segment: 'airport', start: 'dep_at_airport',   end: 'dep_security',       label: 'Airport' },
+  ],
+  arrival: [
+    { segment: 'airport', start: 'arr_off_plane',    end: 'arr_in_transit',     label: 'Airport' },
+    { segment: 'drive',   start: 'arr_in_transit',   end: 'arr_at_destination', label: 'Drive' },
+  ],
+};
+
+function completedLegs(trip, milestones, snapshot) {
+  if (!trip || !snapshot) return [];
+  const defs = SEGMENT_ENDPOINTS[trip.direction] || [];
+  const rows = [];
+  for (const def of defs) {
+    const startMs = milestones.find((m) => m.kind === def.start);
+    const endMs   = milestones.find((m) => m.kind === def.end);
+    if (!startMs || !endMs) continue;
+    const pred = snapshot[def.segment];
+    if (!pred || pred.p50_s == null || pred.p90_s == null) continue;
+    const actualS = (new Date(endMs.logged_at).getTime() - new Date(startMs.logged_at).getTime()) / 1000;
+    if (!Number.isFinite(actualS) || actualS <= 0) continue;
+    const verdict = actualS < pred.p50_s ? 'ahead'
+                  : actualS > pred.p90_s ? 'long'
+                  : 'on';
+    rows.push({ label: def.label, actualS, p50_s: pred.p50_s, p90_s: pred.p90_s, verdict });
   }
+  return rows;
 }
 
-// Returns a one-line "Drive: 38m · predicted 32m p50 / 45m p90 · ahead of
-// plan ✓" string, or '' when no snapshot or no prior endpoint. Folded into
-// the undo toast so the user sees comparison + Undo without one stomping
-// the other (toast container is single-instance).
-function segmentComparisonLine(tripId, kind, loggedAtIso) {
-  const map = segmentForKind(kind);
-  if (!map) return '';
-  const snap = readSegmentsForTrip(tripId);
-  const seg = snap?.[map.segment];
-  if (!seg || seg.p50_s == null || seg.p90_s == null) return '';
-  const prior = state.milestones.find((m) => m.kind === map.prior);
-  if (!prior) return '';
-  const actualS = (new Date(loggedAtIso).getTime() - new Date(prior.logged_at).getTime()) / 1000;
-  if (!Number.isFinite(actualS) || actualS <= 0) return '';
-
-  const verdict = actualS < seg.p50_s ? ' · ahead of plan ✓'
-                : actualS > seg.p90_s ? ' · running long'
-                : '';
-  return `${map.label}: ${formatMins(actualS)} · predicted ${formatMins(seg.p50_s)} p50 / ${formatMins(seg.p90_s)} p90${verdict}`;
+function legPanelHtml(trip) {
+  if (!trip) return '';
+  const snapshot = readSegmentsForTrip(trip.id);
+  const rows = completedLegs(trip, state.milestones, snapshot);
+  if (!rows.length) return '';
+  const verdictText = (v) => v === 'ahead' ? 'ahead ✓'
+                           : v === 'long'  ? 'running long'
+                           : '✓';
+  const rowHtml = (r) => `
+    <div class="log-leg-row" data-verdict="${escapeAttr(r.verdict)}">
+      <span class="log-leg-label">${escapeHtml(r.label)}</span>
+      <span class="log-leg-actual">${escapeHtml(formatMins(r.actualS))}</span>
+      <span class="log-leg-typical">typical ${escapeHtml(formatMins(r.p50_s))}–${escapeHtml(formatMins(r.p90_s))}</span>
+      <span class="log-leg-verdict">${verdictText(r.verdict)}</span>
+    </div>
+  `;
+  return `
+    <div class="log-leg-panel">
+      <h3 class="log-leg-title">Last legs</h3>
+      ${rows.map(rowHtml).join('')}
+    </div>
+  `;
 }
 
 function formatMins(seconds) {

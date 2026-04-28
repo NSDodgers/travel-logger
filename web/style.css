@@ -292,6 +292,61 @@ a { color: var(--accent); text-decoration: none; }
   font-size: 13px;
 }
 
+/* Predicted-vs-actual leg panel — sits between trip-meta and the active
+   grid. One row per completed segment (drive, airport). Stays visible the
+   whole trip; updates each time a segment-end milestone is logged. */
+.log-leg-panel {
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.log-leg-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.log-leg-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  column-gap: 12px;
+  align-items: baseline;
+  padding: 6px 0;
+}
+.log-leg-row + .log-leg-row {
+  border-top: 1px solid var(--border);
+}
+.log-leg-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.log-leg-actual {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.log-leg-typical {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.log-leg-verdict {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.log-leg-row[data-verdict="ahead"] .log-leg-verdict { color: var(--success); }
+.log-leg-row[data-verdict="on"]    .log-leg-verdict { color: var(--success); }
+.log-leg-row[data-verdict="long"]  .log-leg-verdict { color: var(--warning); }
+
 .log-tile-strip {
   display: grid;
   grid-template-columns: 1fr 1fr;
